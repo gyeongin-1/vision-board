@@ -312,7 +312,7 @@ header h1{color:var(--accent-deep)}
 @media (prefers-color-scheme:dark){ .tabs button{color:#d8d8d2} }
 .tabs button:hover{background:rgba(255,255,255,.55)}
 .tabs button.on{background:var(--accent-deep);color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.25)}
-.tabs button.on::before{filter:grayscale(1) brightness(3)}
+.tabs button.on::before{filter:none}
 /* 필터·주요 품목: 라벨을 진한 배지로 */
 .filters .label,.quick .label{background:var(--accent-deep);color:#fff;border-radius:6px;padding:4px 9px;font-size:12px;font-weight:700;margin-right:2px}
 .quick{background:var(--accent-soft);border-color:var(--accent-deep)}
@@ -370,7 +370,13 @@ body.mobile .chip{white-space:nowrap}
 body.mobile #periodAuto{display:none}
 body.mobile .msel>button{min-width:0;padding:6px 8px;font-size:12.5px}
 body.mobile .msel>button .v{max-width:90px}
-body.mobile .pop{width:min(300px,92vw);left:auto;right:0}
+/* 모바일 드롭다운: 화면 아래에 고정된 시트로 띄워 어느 버튼에서 열어도 잘리지 않게 */
+body.mobile .pop{position:fixed;left:8px;right:8px;top:auto;bottom:8px;width:auto;max-height:72vh;border-radius:16px;box-shadow:0 -6px 30px rgba(0,0,0,.28);z-index:80}
+body.mobile .pop input{padding:11px 12px;font-size:15px;margin:10px}
+body.mobile .pop .tools{padding:0 10px 8px;gap:12px;font-size:13.5px;flex-wrap:wrap}
+body.mobile .pop label{padding:11px 12px;font-size:14.5px}
+body.mobile .pop label input{width:18px;height:18px}
+.pop .tools .done{margin-left:auto;background:var(--accent)!important;color:#fff!important;border-radius:6px;padding:3px 10px!important;font-weight:700}
 body.mobile .quick{padding:6px 8px;margin-bottom:12px;gap:5px}
 body.mobile .quick .chip{padding:5px 9px;font-size:12px}
 body.mobile .tabs{width:100%;padding:4px;margin-bottom:12px;gap:4px}
@@ -1496,7 +1502,8 @@ function openPop(host, dim){
   const inp=document.createElement('input'); inp.placeholder=DIM_LABEL[dim]+' 검색'; pop.appendChild(inp);
   const tools=document.createElement('div'); tools.className='tools';
   const bAll=document.createElement('button'); bAll.textContent='전체 선택'; const bNone=document.createElement('button'); bNone.textContent='선택 해제'; const bOnly=document.createElement('button'); bOnly.textContent='검색결과만 선택';
-  tools.append(bAll,bNone,bOnly); pop.appendChild(tools);
+  const bDone=document.createElement('button'); bDone.className='done'; bDone.textContent='완료'; bDone.onclick=()=>closePops();
+  tools.append(bAll,bNone,bOnly,bDone); pop.appendChild(tools);
   const list=document.createElement('div'); list.className='list'; pop.appendChild(list);
   const opts=optionsFor(dim);
   const sel=new Set(state.f[dim]||opts.map(o=>o[0]));
@@ -1508,7 +1515,7 @@ function openPop(host, dim){
   bAll.onclick=()=>{ opts.forEach(o=>sel.add(o[0])); draw(); apply(); };
   bNone.onclick=()=>{ sel.clear(); draw(); apply(); };
   bOnly.onclick=()=>{ sel.clear(); (list._show||[]).forEach(o=>sel.add(o[0])); draw(); apply(); };
-  inp.oninput=draw; draw(); host.appendChild(pop); inp.focus();
+  inp.oninput=draw; draw(); host.appendChild(pop); if(!document.body.classList.contains('mobile')) inp.focus(); // 모바일은 키보드가 올라와 목록을 가리므로 자동 포커스 안 함
 }
 function refreshMsels(){ for(const d of DIMS){ const host=$('#ms-'+d); if(host._render) host._render(); } }
 
