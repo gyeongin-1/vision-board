@@ -708,6 +708,9 @@ body:not(.viewer) .viewer-only{display:none!important}
       <b>주요 품목</b>
       <div><input id="keyProdInput" class="search" style="width:100%;padding:5px 8px" placeholder="예: 펙수클루, 바로에젯, 실리스칸, 스토보클로">
       <div style="color:var(--muted);margin-top:4px">화면 위 퀵 버튼에 나올 품목. 쉼표로 구분, 이름 일부만 써도 됩니다. <button class="btn small" id="btnKeyProd">적용</button></div></div>
+      <b>제외 담당자</b>
+      <div><input id="excludeRepInput" class="search" style="width:100%;padding:5px 8px" placeholder="예: 김소정, 홍길동">
+      <div style="color:var(--muted);margin-top:4px">이 이름으로 된 실적은 집계에서 완전히 뺍니다(쉼표로 여러 명). 파일을 다시 읽지 않고 바로 반영됩니다. <button class="btn small" id="btnExcludeRep">적용</button></div></div>
       <b>품목군 규칙</b>
       <div><textarea id="prodGroupText" class="search" style="width:100%;min-height:72px;padding:6px 8px;font:inherit;resize:vertical" placeholder="품목명에 들어간 글자 → 품목군 이름 (한 줄에 하나)&#10;예: 펙수클루 → 펙수클루군"></textarea>
       <div style="color:var(--muted);margin-top:4px">상세 표(트리)에서 같은 성분의 용량별 품목(예: 펙수클루정 10mg·20mg·40mg)을 한 품목군으로 묶습니다. 규칙이 없어도 용량(mg 등)과 제형(정·캡슐 등)을 떼어 자동으로 묶고, 여기 적은 규칙이 우선합니다. <button class="btn small" id="btnProdGroup">적용</button></div></div>
@@ -831,6 +834,7 @@ const state = {
   patterns: {EVAL:'로컬실적', WAD:'처방실적트렌드'}, // 이 키워드가 파일명에 있는 파일만 읽는다
   skipped: [],
   repMap: {'이주혁':'정영수', '이유나':'정명성', '김경식':'정명성', '김민한':'강태경'}, // 전임자 → 현재 담당자
+  excludeReps: ['김소정'],  // 이 이름의 담당자 행은 집계에서 완전히 제외 (파일 관리에서 변경)
   keyProducts: ['펙수클루','바로에젯','실리스칸','스토보클로'], // 주요 품목 퀵 버튼 (이름 일부만 써도 포함 검색)
   quickActive: null,
   prodGroups: [],       // 품목군 규칙 [{kw, group}] — 품목명에 kw가 들어가면 group으로 묶는다 (없으면 자동 규칙)
@@ -848,6 +852,7 @@ const prodGroupsToText = a => (a||[]).map(r=>`${r.kw} → ${r.group}`).join('\n'
 function prodGroupsFromText(t){ const out=[]; for(const line of String(t).split(/\n/)){ const s=line.trim(); if(!s||s.startsWith('#')) continue; const p=s.split(/\s*(?:→|->|=>|=|>|:)\s*/); if(p.length>=2&&p[0]&&p[1]) out.push({kw:p[0].trim(), group:p[1].trim()}); } return out; }
 try{ const k=JSON.parse(localStorage.getItem('tb.keyProducts')||'null'); if(Array.isArray(k)) state.keyProducts=k; }catch(e){}
 try{ const m=JSON.parse(localStorage.getItem('tb.repMap')||'null'); if(m&&typeof m==='object') state.repMap=m; }catch(e){}
+try{ const x=JSON.parse(localStorage.getItem('tb.excludeReps')||'null'); if(Array.isArray(x)) state.excludeReps=x; }catch(e){}
 const repMapToText = m => Object.entries(m).map(([a,b])=>`${a} → ${b}`).join('\n');
 function repMapFromText(t){ const m={}; for(const line of String(t).split(/\n/)){ const s=line.trim(); if(!s||s.startsWith('#')) continue; const p=s.split(/\s*(?:→|->|=>|=|>|:)\s*/); if(p.length>=2&&p[0]&&p[1]) m[p[0].trim()]=p[1].trim(); } return m; }
 try{ const p=JSON.parse(localStorage.getItem('tb.patterns')||'null'); if(p&&typeof p.EVAL==='string'&&typeof p.WAD==='string') state.patterns=p; }catch(e){}
@@ -1313,6 +1318,7 @@ function terminateWorkers(){ // 읽기가 끝나면 워커를 내려 메모리�
 function effectiveType(f){ return state.overrides[f.name] || f.type; }
 function mergeAll(){
   const out={}; const repMap=state.repMap||{}; const office=(state.office||'').trim();
+  const excl=new Set((state.excludeReps||[]).map(s=>String(s).trim()).filter(Boolean));
   for(const type of ['WAD','EVAL']){
     // 같은 달을 가진 파일이 여럿이면: 파일명 버전(v2 < v3)이 큰 쪽 → 그래도 같으면 수정일이 최신인 쪽
     const files=state.files.filter(f=>!f.error && effectiveType(f)===type).sort((a,b)=>(fileVersion(b.name)-fileVersion(a.name)) || (b.lastModified-a.lastModified));
@@ -1326,6 +1332,7 @@ function mergeAll(){
       for(const row of f.rows){
         if(office && row[0] && !row[0].includes(office)) continue; // 우리 사무소 외 행은 유형(WAD/평가실적)과 무관하게 제외
         const rep0=row[1], rep=repMap[rep0]||rep0; // 담당자 이름 통합(전임자 → 현재 담당자)
+        if(excl.has(rep0)||excl.has(rep)) continue; // 제외 담당자
         const key=[row[0],rep,row[2],row[3]].join(SEP);
         let rec=map.get(key); if(!rec){ rec={office:row[0],rep,client:row[2],product:row[3]||'(전체)',v:new Float64Array(months.length),old:null}; map.set(key,rec); }
         const vals=row[4]; for(const [si,di] of idxPairs){ rec.v[di]+=vals[si]||0; }
@@ -1337,7 +1344,7 @@ function mergeAll(){
     }
     // 담당자별 기준점(목표): 평가실적 파일의 담당자별 시트에서 읽은 값을 월별로 모은다 (전임자 이름 통합 반영)
     const baseline={};
-    if(type==='EVAL'){ for(const f of files){ if(!f.baseline || !f.applied || f.applied.length!==1) continue; const m=f.applied[0]; const b=baseline[m]||(baseline[m]={}); for(const [rep0,val] of Object.entries(f.baseline)){ const rep=repMap[rep0]||rep0; b[rep]=(b[rep]||0)+val; } } }
+    if(type==='EVAL'){ for(const f of files){ if(!f.baseline || !f.applied || f.applied.length!==1) continue; const m=f.applied[0]; const b=baseline[m]||(baseline[m]={}); for(const [rep0,val] of Object.entries(f.baseline)){ const rep=repMap[rep0]||rep0; if(excl.has(rep0)||excl.has(rep)) continue; b[rep]=(b[rep]||0)+val; } } }
     out[type]={months, rows:[...map.values()], fileCount:files.length, baseline};
   }
   for(const f of state.files){ if(f.error || !['WAD','EVAL'].includes(effectiveType(f))) f.applied=[]; }
@@ -2620,7 +2627,7 @@ $('#btnPatterns').onclick=()=>{
 };
 async function clearFileCache(){ try{ const ids=(await idb.get('fileIndex'))||[]; for(const id of ids) await idb.del('file:'+id); await idb.del('fileIndex'); await idb.del('files'); }catch(e){} state.files=[]; }
 /* 설정 내보내기/가져오기: 브라우저에만 저장되는 관리자 설정을 파일로 옮긴다 (데스크톱 ↔ 노트북). 게시용 소금(pubSalt)도 함께 옮겨 직원이 비밀번호를 다시 넣지 않게 한다 */
-const SETTING_KEYS=['tb.office','tb.patterns','tb.repMap','tb.keyProducts','tb.prodGroups','tb.grades','tb.checks','tb.ui','tb.pubSalt'];
+const SETTING_KEYS=['tb.office','tb.patterns','tb.repMap','tb.excludeReps','tb.keyProducts','tb.prodGroups','tb.grades','tb.checks','tb.ui','tb.pubSalt'];
 $('#btnSetExport').onclick=()=>{
   const out={fmt:'tb-settings-1', exportedAt:new Date().toISOString(), values:{}};
   for(const k of SETTING_KEYS){ try{ const v=localStorage.getItem(k); if(v!==null) out.values[k]=v; }catch(e){} }
@@ -2662,6 +2669,8 @@ $('#treeTools').onclick=e=>{ const c=e.target.closest('.chip'); if(!c) return;
   if(c.dataset.t==='close') state.treeOpen.clear();
   else { for(const t of activeTypes()) for(const r of rowsFor(t)){ if(rowPass(r)) state.treeOpen.add(r.rep||'(없음)'); } }
   renderTable(aggregate()); };
+$('#excludeRepInput').value=(state.excludeReps||[]).join(', ');
+$('#btnExcludeRep').onclick=()=>{ state.excludeReps=$('#excludeRepInput').value.split(/[,，\n]/).map(s=>s.trim()).filter(Boolean); localStorage.setItem('tb.excludeReps',JSON.stringify(state.excludeReps)); for(const d of DIMS) state.f[d]=null; mergeAll(); renderAll(); toast(state.excludeReps.length?`제외 담당자 ${state.excludeReps.length}명 적용`:'제외 담당자 없음'); };
 $('#prodGroupText').value=prodGroupsToText(state.prodGroups);
 $('#btnProdGroup').onclick=()=>{ state.prodGroups=prodGroupsFromText($('#prodGroupText').value); localStorage.setItem('tb.prodGroups',JSON.stringify(state.prodGroups)); resetProductGroups(); renderAll(); toast(`품목군 규칙 ${state.prodGroups.length}건 적용 (규칙 없는 품목은 자동으로 묶습니다)`); };
 $('#dimChips').onclick=e=>{ const c=e.target.closest('.chip'); if(!c) return; const d=c.dataset.d; if(state.dims.includes(d)){ if(state.dims.length>1) state.dims=state.dims.filter(x=>x!==d); } else state.dims=[...state.dims,d]; state.sort={key:'last',asc:false}; saveUI(); renderAll(); };
