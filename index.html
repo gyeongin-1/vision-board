@@ -298,6 +298,12 @@ body[data-mode="EVAL"]{ --accent-deep:#a8431a; --sum-bg:#fbe4d6; }
 body[data-mode="CMP"]{ --accent-deep:#372a7e; --sum-bg:#e6e2f6; }
 @media (prefers-color-scheme:dark){ body[data-mode="EVAL"]{ --accent-deep:#c6552a; --sum-bg:#3d2415; } body[data-mode="CMP"]{ --accent-deep:#6b5bd0; --sum-bg:#2a2450; } }
 header{border-bottom:4px solid var(--accent-deep);box-shadow:0 2px 10px rgba(0,0,0,.12)}
+/* 현황판 / TEAM 페이지 이동 탭 (team.html 상단과 같은 모양) */
+.navtabs{display:inline-flex;gap:6px;align-items:center}
+.navtabs a,.navtabs span{border:1px solid var(--border-strong);border-radius:8px;padding:7px 14px;font-size:13.5px;font-weight:600;color:var(--ink-2);text-decoration:none;background:var(--surface);line-height:1.2}
+.navtabs a:hover{background:var(--surface-2)}
+.navtabs .on{background:var(--accent-deep);color:#fff;border-color:var(--accent-deep);font-weight:700}
+body.mobile .navtabs a,body.mobile .navtabs span{padding:6px 10px;font-size:12.5px}
 header h1{color:var(--accent-deep)}
 /* 카드 경계와 제목 띠 */
 .card,.tablecard,.kpi,.gcard,.rep-card,.filters,.quick,.ins-bar{border:1.5px solid var(--border-strong);box-shadow:0 1px 2px rgba(0,0,0,.06),0 6px 18px rgba(0,0,0,.09)}
@@ -559,7 +565,7 @@ body:not(.viewer) .viewer-only{display:none!important}
   </div>
   <button class="btn admin-only" id="btnRefresh" title="폴더의 파일을 다시 읽습니다">🔄 새로고침</button>
   <button class="btn admin-only" id="btnFolder">📁 데이터 폴더 선택</button>
-  <a class="btn" id="btnTeam" href="team.html" title="팀 할 일(TEAM) 페이지" style="text-decoration:none">👥 TEAM</a> <button class="btn admin-only" id="btnFiles">📄 파일 관리 <span class="badge" id="fileCount">0</span></button>
+  <span class="navtabs" title="현황판 / 팀 할 일(TEAM) 페이지"><span class="on">현황판</span><a id="btnTeam" href="team.html">TEAM</a></span> <button class="btn admin-only" id="btnFiles">📄 파일 관리 <span class="badge" id="fileCount">0</span></button>
   <button class="btn primary admin-only" id="btnPublish" title="직원용 사이트에 올릴 암호화 데이터 파일(data.enc)을 만듭니다">🌐 게시용 내보내기</button>
   <button class="btn" id="btnLayout" title="PC 화면과 모바일 화면을 바꿉니다">📱 모바일</button>
   <button class="btn" id="btnPrint" title="지금 보고 있는 탭과 필터 그대로 한 장 PDF로 저장합니다 (인쇄 창에서 'PDF로 저장' 선택)">🖨 PDF 저장</button>

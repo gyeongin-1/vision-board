@@ -123,6 +123,71 @@ button,input,select,textarea{font:inherit;color:inherit} button{cursor:pointer}
 .admin-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
 .admin-list .m{display:flex;gap:8px;align-items:center;border:1px solid var(--grid);border-radius:8px;padding:6px 10px}
 .admin-list .m b{flex:1}
+
+/* ===== 현황판(Vision Board)과 테마 통일: 밝은 회색 배경 · 진한 파랑 #1c4f8f · 색 띠 제목 · 진한 테두리 카드 ===== */
+:root{
+  --page:#e3e3dd; --surface:#ffffff; --surface-2:#f0efec; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+  --grid:#d3d2ca; --border:#a9a8a0; --navy:#1c4f8f; --navy-2:#2a78d6; --accent:#2a78d6; --accent-soft:#e3eefb;
+  --blue-soft:#dce8f8; --blue-ink:#1c4f8f; --green:#1e7f4f; --green-soft:#dff3e8; --red:#d03b3b; --red-soft:#fde2df;
+  --yellow:#fff4d6; --yellow-ink:#6b4d00;
+  --shadow:0 1px 2px rgba(0,0,0,.06),0 6px 18px rgba(0,0,0,.09);
+}
+body{color:var(--ink)}
+/* 상단 바: 현황판 헤더와 같은 흰 바 + 진한 파랑 밑줄, 왼쪽에 브랜드 */
+.top{background:var(--surface);color:var(--ink);height:auto;min-height:56px;padding:10px 24px;border-bottom:4px solid var(--navy);box-shadow:0 2px 10px rgba(0,0,0,.12);gap:12px;flex-wrap:wrap}
+.top .tabs::before{content:"경인1 Vision Board";color:var(--navy);font-weight:700;font-size:19px;letter-spacing:-.01em;margin-right:14px;align-self:center}
+.top .tabs{align-items:center;gap:6px}
+.top .tabs a,.top .tabs button{color:var(--ink-2);border:1px solid var(--border);border-radius:8px;padding:7px 14px;font-size:13.5px;font-weight:600;background:var(--surface)}
+.top .tabs a:hover,.top .tabs button:hover{background:var(--surface-2)}
+.top .tabs .on{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700}
+.top label{color:var(--ink-2)}
+.top .user{color:var(--ink)} .top .user small{color:var(--muted)}
+.top .out,.top .btn{color:var(--ink);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px}
+.top .out:hover,.top .btn:hover{background:var(--surface-2)}
+/* 카드 */
+.pane,.login{border:1.5px solid var(--border);border-radius:12px;box-shadow:var(--shadow)}
+.pane{padding:16px 18px 18px}
+.eyebrow{color:var(--navy);font-size:12px}
+.title-row{margin:2px 0 8px}
+.title-row h1,.cal-head h2,.done-head h2,.login h1{background:var(--accent-soft);color:var(--navy);border-left:6px solid var(--navy);border-radius:6px;padding:7px 12px;font-size:16px;font-weight:800;letter-spacing:0;margin:0}
+.cal-head h2{flex:1} .login h1{margin-bottom:10px}
+.badge{background:var(--surface-2);border:1px solid var(--border);color:var(--ink-2);font-weight:600}
+.members{color:var(--ink-2)}
+/* 버튼·입력 */
+.btn{border:1px solid var(--border);border-radius:8px;font-size:13px;padding:7px 12px}
+.btn.primary{background:var(--navy);color:#fff;border-color:transparent} .btn.primary:hover{background:var(--navy-2)}
+.btn.danger{color:var(--red);border-color:#e8b4ae}
+.quick{background:var(--accent-soft);border:1px solid var(--border);border-radius:12px}
+.quick input[type=text],.quick input[type=date],.quick input[type=time],.f input,.f select,.f textarea{border:1px solid var(--border);border-radius:8px;background:#fff}
+/* 할 일 항목 */
+.task{border-bottom:1px solid var(--grid)}
+.task .cb{border-color:var(--border)} .task .cb.me{background:var(--navy);border-color:var(--navy)}
+.task .when{color:var(--navy)}
+.task .tt{font-size:15.5px}
+.chip.name{border-color:var(--border)} .chip.name.ok{background:var(--green-soft);color:var(--green);border-color:#bfe3cf} .chip.name.no{background:var(--blue-soft);color:var(--blue-ink);border-color:#c3d6f2}
+.dayhead{border-bottom:2px solid var(--border);padding-bottom:4px;margin:16px 0 4px}
+.dayhead b{color:var(--navy)}
+/* 달력: 표 머리글처럼 진한 파랑 */
+.cal{border-left:1px solid var(--grid);border-top:1px solid var(--grid);border-radius:6px;overflow:hidden}
+.cal .dow{background:var(--navy);color:#fff;font-weight:700;border-right:1px solid rgba(255,255,255,.18);border-bottom:2px solid var(--navy)}
+.cal .dow:first-child{color:#ffb4a8} .cal .dow:nth-child(7){color:#bcd6ff}
+.cal .day{background:#fff} .cal .day:hover{background:var(--surface-2)} .cal .day.out{color:#b8b7b0;background:#f6f6f3}
+.cal .day.today{outline:2px solid var(--accent);outline-offset:-2px} .cal .day.sel{background:var(--accent-soft)}
+.cal .ev{background:var(--blue-soft);color:var(--blue-ink)}
+.cal-nav{border-color:var(--border);border-radius:8px} .cal-nav button{border-right-color:var(--grid)}
+.done-head .gal{color:var(--accent);font-weight:600}
+/* 모달·로그인 */
+.modal{border:1.5px solid var(--border);border-radius:12px}
+.modal h3{background:var(--accent-soft);color:var(--navy);border-left:6px solid var(--navy);border-radius:6px;padding:7px 12px;font-size:16px}
+.modal h3 .x{color:var(--ink-2)}
+.login{max-width:560px;padding:24px 26px}
+.login .names button{border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-weight:600}
+.login .names button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.note{background:var(--yellow);border:1px solid var(--yellow-ink);color:var(--yellow-ink);border-radius:8px}
+.toast{background:var(--ink);color:#fff;border-radius:8px}
+.admin-list .m{border:1px solid var(--grid);border-radius:8px}
+.wrap{gap:16px;padding:18px 24px 60px}
+@media (max-width:700px){ .top{padding:8px 10px;gap:6px} .top .tabs::before{font-size:15px;flex:1 1 100%;margin:0 0 4px} .top .tabs{flex-wrap:wrap} .wrap{padding:10px} .pane{padding:12px} .cal .day{min-height:64px} }
 </style>
 </head>
 <body>
