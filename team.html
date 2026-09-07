@@ -187,6 +187,22 @@ body{color:var(--ink)}
 .toast{background:var(--ink);color:#fff;border-radius:8px}
 .admin-list .m{border:1px solid var(--grid);border-radius:8px}
 .wrap{gap:16px;padding:18px 24px 60px}
+/* 가독성: 현황판과 같은 글자 크기 단계 */
+:root{ --ink-2:#3f3e3b; --muted:#6f6e68; }
+body{font-size:15px}
+.top .tabs a,.top .tabs button{font-size:14px}
+.top label,.top .user,.top .out,.top .btn{font-size:13.5px}
+.btn{font-size:14px} .btn.small{font-size:13px}
+.title-row h1,.cal-head h2,.done-head h2,.login h1,.modal h3{font-size:17px}
+.members{font-size:14px}
+.badge{font-size:12.5px}
+.quick input[type=text],.quick input[type=date],.quick input[type=time]{font-size:14px}
+.dayhead{font-size:14px}
+.task .when{font-size:14.5px} .task .tt{font-size:17px} .task .meta{font-size:13.5px} .task .memo{font-size:14.5px}
+.chip{font-size:13px}
+.cal .dow{font-size:13px} .cal .day .n{font-size:14px} .cal .ev{font-size:12px}
+.f label{font-size:14px} .f .hint,.small-muted{font-size:13px}
+.login p{font-size:14.5px} .login .names button{font-size:15px}
 @media (max-width:700px){ .top{padding:8px 10px;gap:6px} .top .tabs::before{font-size:15px;flex:1 1 100%;margin:0 0 4px} .top .tabs{flex-wrap:wrap} .wrap{padding:10px} .pane{padding:12px} .cal .day{min-height:64px} }
 </style>
 </head>

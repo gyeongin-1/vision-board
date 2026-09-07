@@ -359,6 +359,72 @@ table.ins td.gq{background:var(--sum-bg);border-left:2px solid var(--border-stro
 /* 다크 모드에서 흰 글씨 머리글이 튀지 않게 */
 @media (prefers-color-scheme:dark){ table.data th.sum{background:#0f2f57} }
 
+/* ===== 가독성 v4: 글자 한 단계 크게, 여백 넉넉히, 회색 글자 대비 올림 (PC 기준 · 모바일은 아래 블록이 다시 조정) ===== */
+:root{ --ink-2:#3f3e3b; --muted:#6f6e68; }
+@media (prefers-color-scheme:dark){ :root{ --ink-2:#d0cfc8; --muted:#a3a29b; } }
+body{font-size:15px}
+header h1{font-size:20px}
+header .status{font-size:13px;line-height:1.4}
+.btn{font-size:14px;padding:8px 13px}
+.btn.small{font-size:13px;padding:5px 10px}
+.seg button{font-size:14px;padding:8px 14px}
+.chip{font-size:13.5px;padding:6px 12px}
+select.sel{font-size:14px;padding:7px 9px}
+.msel>button{font-size:14px}
+.filters .label,.quick .label{font-size:13px;padding:5px 10px}
+.quick .chip{font-size:13.5px;padding:6px 13px}
+.badge{font-size:12.5px}
+.tabs button{font-size:16.5px;padding:12px 28px}
+.kpi .t{font-size:13.5px}
+.kpi .v{font-size:30px}
+.kpi .d{font-size:13.5px;margin-top:6px}
+.card h3,.tablecard .hd h3{font-size:17px;padding:8px 14px}
+.card .sub,.tablecard .hd .sub{font-size:13.5px}
+.legend{font-size:13px}
+svg.chart text{font-size:12px}
+svg.chart .lbl{font-size:12px}
+svg.chart .hlabel{font-size:13px}
+svg.chart .hval{font-size:12.5px}
+.mini{font-size:13.5px} .mini th{font-size:12.5px}
+table.data{font-size:14px}
+table.data th{font-size:13.5px;padding:8px 10px}
+table.data td{padding:8px 10px}
+table.data td.tree .lv{font-size:11px}
+table.data td.tree .cnt{font-size:12.5px}
+table.ins{font-size:14px}
+table.ins th{font-size:13px;padding:7px 9px}
+table.ins td{padding:8px 9px}
+table.ins td.l{max-width:240px}
+.flag,.tag{font-size:12px}
+.findings li{font-size:15px;padding:10px 0 10px 30px}
+.checks li{font-size:15px;padding:10px 6px}
+.checks li .who{font-size:12.5px}
+.rep-card .n{font-size:15px} .rep-card .m{font-size:13.5px}
+.ins-bar{font-size:13.5px}
+.ins-bar input{width:90px;font-size:14px}
+.gcard .nm{font-size:16px}
+.gblk .l,.gblk .b{font-size:12px}
+.gblk .a{font-size:19px}
+.gblk .r{font-size:13.5px}
+.grade{font-size:13px;min-width:36px}
+.gcell small{font-size:12px}
+.foot,#tfoot{font-size:13px}
+.tip{font-size:13.5px}
+.tip .h{font-size:12.5px}
+.pop label{font-size:14px;padding:7px 9px}
+.pop input{font-size:14px}
+.empty-note{font-size:13.5px}
+.notice{font-size:14px}
+.focus-sum .kpi .v{font-size:26px}
+.dlg .sub,.dlg .field,.dlg .summary,.dlg .steps{font-size:13.5px}
+#gate p{font-size:14.5px} #gate .err{font-size:13.5px} #gate label{font-size:13.5px}
+/* 상단 바는 한 줄 유지: 버튼은 기존 크기 */
+header .btn{font-size:13px;padding:7px 11px}
+header .seg button{font-size:13px;padding:7px 12px}
+header .navtabs a,header .navtabs span{font-size:13px;padding:7px 12px}
+header .status{max-width:520px}
+body.viewer header .status{display:none} /* 직원 화면: 상단 상태 문구 숨김 (갱신 시각은 로그인 화면과 PDF 머리글에 남음) */
+
 /* ===== 모바일 버전 (body.mobile): 세로 한 열, 큰 터치 영역, 표는 가로 스크롤 ===== */
 body.mobile header{padding:8px 10px;gap:6px}
 body.mobile header h1{font-size:15px;flex:1 1 100%}
