@@ -559,7 +559,7 @@ body:not(.viewer) .viewer-only{display:none!important}
   </div>
   <button class="btn admin-only" id="btnRefresh" title="폴더의 파일을 다시 읽습니다">🔄 새로고침</button>
   <button class="btn admin-only" id="btnFolder">📁 데이터 폴더 선택</button>
-  <button class="btn admin-only" id="btnFiles">📄 파일 관리 <span class="badge" id="fileCount">0</span></button>
+  <a class="btn" id="btnTeam" href="team.html" title="팀 할 일(TEAM) 페이지" style="text-decoration:none">👥 TEAM</a> <button class="btn admin-only" id="btnFiles">📄 파일 관리 <span class="badge" id="fileCount">0</span></button>
   <button class="btn primary admin-only" id="btnPublish" title="직원용 사이트에 올릴 암호화 데이터 파일(data.enc)을 만듭니다">🌐 게시용 내보내기</button>
   <button class="btn" id="btnLayout" title="PC 화면과 모바일 화면을 바꿉니다">📱 모바일</button>
   <button class="btn" id="btnPrint" title="지금 보고 있는 탭과 필터 그대로 한 장 PDF로 저장합니다 (인쇄 창에서 'PDF로 저장' 선택)">🖨 PDF 저장</button>
@@ -836,7 +836,7 @@ const state = {
   unit: 1,
   f: {from:null, to:null, office:null, rep:null, client:null, product:null},
   dims: ['rep'],
-  sort: {key:'last', asc:false},
+  sort: {key:'dim:0', asc:true}, // 평면 표 기본 정렬: 가나다순
   search: '',
   hideZero: true,
   overrides: {},
@@ -2715,7 +2715,7 @@ $('#excludeRepInput').value=(state.excludeReps||[]).join(', ');
 $('#btnExcludeRep').onclick=()=>{ state.excludeReps=$('#excludeRepInput').value.split(/[,，\n]/).map(s=>s.trim()).filter(Boolean); localStorage.setItem('tb.excludeReps',JSON.stringify(state.excludeReps)); for(const d of DIMS) state.f[d]=null; mergeAll(); renderAll(); toast(state.excludeReps.length?`제외 담당자 ${state.excludeReps.length}명 적용`:'제외 담당자 없음'); };
 $('#prodGroupText').value=prodGroupsToText(state.prodGroups);
 $('#btnProdGroup').onclick=()=>{ state.prodGroups=prodGroupsFromText($('#prodGroupText').value); localStorage.setItem('tb.prodGroups',JSON.stringify(state.prodGroups)); resetProductGroups(); renderAll(); toast(`품목군 규칙 ${state.prodGroups.length}건 적용 (규칙 없는 품목은 자동으로 묶습니다)`); };
-$('#dimChips').onclick=e=>{ const c=e.target.closest('.chip'); if(!c) return; const d=c.dataset.d; if(state.dims.includes(d)){ if(state.dims.length>1) state.dims=state.dims.filter(x=>x!==d); } else state.dims=[...state.dims,d]; state.sort={key:'last',asc:false}; saveUI(); renderAll(); };
+$('#dimChips').onclick=e=>{ const c=e.target.closest('.chip'); if(!c) return; const d=c.dataset.d; if(state.dims.includes(d)){ if(state.dims.length>1) state.dims=state.dims.filter(x=>x!==d); } else state.dims=[...state.dims,d]; state.sort={key:'dim:0',asc:true}; saveUI(); renderAll(); };
 $('#search').oninput=e=>{ state.search=e.target.value; renderTable(aggregate()); };
 $('#hideZero').onchange=e=>{ state.hideZero=e.target.checked; renderTable(aggregate()); };
 $('#btnCsv').onclick=exportXlsx;

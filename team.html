@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>경인1 TEAM</title>
+<style>
+:root{
+  --page:#eef1f5; --surface:#ffffff; --surface-2:#f4f6f9; --ink:#14213d; --ink-2:#4b5563; --muted:#8a94a6;
+  --grid:#e3e7ee; --border:#cfd6e0; --navy:#1b3a5c; --navy-2:#24507d; --accent:#2a78d6; --accent-soft:#e3eefb;
+  --yellow:#fff3b0; --yellow-ink:#6b4d00; --blue-soft:#dbe8fb; --blue-ink:#1c4f8f; --green:#1e7f4f; --green-soft:#dff3e8; --red:#c0392b; --red-soft:#fde2df;
+  --shadow:0 1px 2px rgba(0,0,0,.05),0 8px 24px rgba(20,33,61,.08);
+}
+*{box-sizing:border-box} html,body{margin:0;padding:0}
+body{background:var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+button,input,select,textarea{font:inherit;color:inherit} button{cursor:pointer}
+.hidden{display:none!important}
+
+/* 상단 바 */
+.top{background:var(--navy);color:#fff;display:flex;align-items:center;gap:14px;padding:0 18px;height:56px;position:sticky;top:0;z-index:20}
+.top .tabs{display:flex;gap:4px}
+.top .tabs a,.top .tabs button{color:#dbe4f0;text-decoration:none;padding:16px 14px;border:0;background:none;font-size:15px;border-radius:8px}
+.top .tabs .on{background:#2f5a86;color:#fff;font-weight:700}
+.top .spacer{flex:1}
+.top label{display:flex;gap:6px;align-items:center;font-size:13px;color:#e6edf6}
+.top .user{display:flex;align-items:center;gap:6px;font-size:13.5px} .top .user b{font-weight:700} .top .user small{color:#9fb6d0}
+.top .out{border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:8px;padding:6px 12px;font-size:13px}
+.top .btn{color:#fff;background:transparent;border-color:rgba(255,255,255,.35)} .top .btn:hover{background:rgba(255,255,255,.12)}
+
+/* 3분할 */
+.wrap{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px;padding:14px;max-width:1700px;margin:0 auto}
+.right{display:flex;flex-direction:column;gap:14px;min-width:0}
+.pane{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow);min-width:0}
+@media (max-width:1000px){.wrap{grid-template-columns:1fr}}
+
+/* 좌측: 할 일 */
+.eyebrow{font-size:12px;font-weight:800;color:#1f7a5c;letter-spacing:.06em}
+.title-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 6px}
+.title-row h1{margin:0;font-size:28px;letter-spacing:-.02em}
+.badge{background:var(--surface-2);border:1px solid var(--border);border-radius:99px;padding:2px 10px;font-size:12px;color:var(--ink-2)}
+.members{font-size:13px;color:var(--ink-2);margin-bottom:12px}
+.members span+span::before{content:" · "}
+.btn{border:1px solid var(--border);background:var(--surface);border-radius:9px;padding:8px 13px;font-size:13.5px;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--navy);color:#fff;border-color:transparent} .btn.primary:hover{background:var(--navy-2)}
+.btn.small{padding:4px 9px;font-size:12.5px;border-radius:7px}
+.btn.danger{color:var(--red);border-color:#e8b4ae}
+.quick{display:flex;gap:8px;align-items:center;background:var(--surface-2);border:1px solid var(--grid);border-radius:12px;padding:10px;margin:8px 0 14px;flex-wrap:wrap}
+.quick input[type=text]{flex:1 1 220px;padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:#fff}
+.quick input[type=date],.quick input[type=time]{padding:9px 10px;border:1px solid var(--border);border-radius:9px;background:#fff}
+.dayhead{display:flex;align-items:center;gap:8px;margin:14px 0 6px;color:var(--ink-2);font-size:13px}
+.dayhead b{color:var(--ink)} .dayhead .cnt{color:var(--muted)}
+.task{display:grid;grid-template-columns:28px 24px 1fr auto;gap:10px;align-items:start;padding:14px 4px;border-bottom:1px solid var(--grid)}
+.task:last-child{border-bottom:0}
+.task .cb{width:22px;height:22px;border:2px solid #9aa7b8;border-radius:6px;background:#fff;cursor:pointer;display:grid;place-items:center;margin-top:2px}
+.task .cb.me{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:800;font-size:14px}
+.task .star{background:none;border:0;font-size:20px;color:#cfd6e0;padding:0;line-height:1;margin-top:1px} .task .star.on{color:#f3b400}
+.task .when{font-size:14px;font-weight:700;color:var(--navy-2)} .task .when small{font-weight:500;color:var(--muted);margin-left:6px}
+.task .tt{font-size:16px;font-weight:700;margin:4px 0 2px;word-break:break-all} .task.done .tt{text-decoration:line-through;color:var(--muted)}
+.task .meta{font-size:12.5px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.chip{border-radius:99px;padding:3px 10px;font-size:12.5px;font-weight:700;border:1px solid transparent}
+.chip.due{background:var(--yellow);color:var(--yellow-ink)} .chip.due.over{background:var(--red-soft);color:var(--red)}
+.chip.lab{background:var(--yellow);color:var(--yellow-ink)} .chip.lab.b{background:var(--blue-soft);color:var(--blue-ink)}
+.chip.name{background:#fff;border-color:var(--border);color:var(--ink-2);font-weight:600}
+.chip.name.ok{background:var(--green-soft);color:var(--green);border-color:#bfe3cf} .chip.name.no{background:var(--blue-soft);color:var(--blue-ink);border-color:#c3d6f2}
+.task .memo{margin-top:8px;font-size:14px;white-space:pre-wrap;word-break:break-word}
+.photos{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.photos img{width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in;background:#f2f2f2}
+.task .acts{display:flex;gap:6px}
+.empty{color:var(--muted);text-align:center;padding:30px 0}
+
+/* 달력 */
+.cal-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.cal-head h2{margin:0;font-size:22px;flex:1;display:flex;align-items:center;gap:8px}
+.cal-nav{display:flex;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.cal-nav button{border:0;background:#fff;padding:7px 12px;border-right:1px solid var(--border);font-size:14px} .cal-nav button:last-child{border-right:0}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);border-left:1px solid var(--grid);border-top:1px solid var(--grid)}
+.cal .dow{text-align:center;font-size:12.5px;color:var(--ink-2);padding:6px 0;border-right:1px solid var(--grid);border-bottom:1px solid var(--grid);background:var(--surface-2)}
+.cal .dow:first-child{color:#c0392b} .cal .dow:nth-child(7){color:#1c4f8f}
+.cal .day{min-height:88px;border-right:1px solid var(--grid);border-bottom:1px solid var(--grid);padding:6px;position:relative;cursor:pointer;background:#fff}
+.cal .day:hover{background:#f7f9fc} .cal .day.out{color:#b8c0cc;background:#fafbfc} .cal .day.today{outline:2px solid var(--navy-2);outline-offset:-2px}
+.cal .day.sel{background:var(--accent-soft)}
+.cal .day .n{font-size:13px;font-weight:700}
+.cal .ev{margin-top:3px;font-size:11.5px;background:var(--blue-soft);color:var(--blue-ink);border-radius:5px;padding:1px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal .ev.done{text-decoration:line-through;background:var(--surface-2);color:var(--muted)}
+.cal .ev.imp::before{content:"★ ";color:#e0a300}
+.cal .more{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* 완료 */
+.done-head{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.done-head h2{margin:0;font-size:22px;display:flex;align-items:center;gap:8px}
+.done-head .spacer{flex:1}
+.done-head .gal{font-size:13px;color:var(--ink-2);background:none;border:0}
+
+/* 모달 */
+.overlay{position:fixed;inset:0;background:rgba(10,20,40,.45);z-index:50;display:none;align-items:center;justify-content:center;padding:16px}
+.overlay.on{display:flex}
+.modal{background:#fff;border-radius:16px;width:min(760px,100%);max-height:92vh;overflow:auto;padding:22px 24px;box-shadow:var(--shadow)}
+.modal h3{margin:0 0 14px;font-size:20px;display:flex;align-items:center} .modal h3 .x{margin-left:auto;border:0;background:none;font-size:22px;color:var(--ink-2)}
+.f{margin-bottom:12px} .f label{display:block;font-size:13px;color:var(--ink-2);margin-bottom:5px}
+.f input,.f select,.f textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:#fff}
+.f textarea{min-height:110px;resize:vertical}
+.f .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.f .hint{font-size:12px;color:var(--muted);margin-top:4px}
+.f.check{display:flex;gap:8px;align-items:center} .f.check input{width:auto}
+.modal .foot{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+.pick{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.pick img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border)}
+.pick .ph{position:relative} .pick .ph button{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:#333;color:#fff;font-size:12px;line-height:1}
+.viewer{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:60;display:none;align-items:center;justify-content:center;cursor:zoom-out}
+.viewer.on{display:flex} .viewer img{max-width:95vw;max-height:95vh;border-radius:6px}
+
+/* 로그인 / 설정 */
+.login{max-width:520px;margin:60px auto;background:#fff;border:1px solid var(--border);border-radius:16px;padding:26px 28px;box-shadow:var(--shadow)}
+.login h1{margin:0 0 6px;font-size:22px} .login p{color:var(--ink-2);margin:0 0 16px}
+.login .names{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.login .names button{border:1px solid var(--border);background:#fff;border-radius:99px;padding:8px 14px;font-size:14px}
+.login .names button.on{background:var(--navy);color:#fff;border-color:transparent}
+.note{background:#fff8dc;border:1px solid #f1dc8f;border-radius:10px;padding:10px 12px;font-size:13px;color:#6b4d00;margin-bottom:12px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#14213d;color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;z-index:70;display:none}
+.small-muted{font-size:12px;color:var(--muted)}
+.admin-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.admin-list .m{display:flex;gap:8px;align-items:center;border:1px solid var(--grid);border-radius:8px;padding:6px 10px}
+.admin-list .m b{flex:1}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="tabs">
+    <a href="./" title="현황판으로">현황판</a>
+    <button class="on">TEAM</button>
+  </div>
+  <div class="spacer"></div>
+  <label><input type="checkbox" id="showDone" checked> 완료 Task 표시</label>
+  <div class="user" id="userBox"></div>
+  <button class="btn small" id="btnAdmin" title="팀원·설정 관리">설정</button>
+  <button class="out" id="btnLogout">로그아웃</button>
+</div>
+
+<!-- 로그인 -->
+<div class="login" id="login" hidden>
+  <h1>경인1 TEAM</h1>
+  <p id="loginSub">이름을 고르세요.</p>
+  <div id="loginNote"></div>
+  <div class="names" id="loginNames"></div>
+  <div class="f" id="pinRow" hidden><label>PIN (4자리)</label><input type="password" id="pin" inputmode="numeric" maxlength="8" placeholder="처음이면 새 PIN을 정하세요"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn primary" id="btnLogin">들어가기</button></div>
+</div>
+
+<!-- 첫 설정 (팀 만들기) -->
+<div class="login" id="setup" hidden>
+  <h1>팀 만들기</h1>
+  <p>처음 한 번만 합니다. 팀 이름, 팀원, 관리자 비밀번호를 정하세요.</p>
+  <div class="f"><label>팀 이름</label><input id="setTeam" value="경인1"></div>
+  <div class="f"><label>팀원 (한 줄에 한 명)</label><textarea id="setMembers" placeholder="최주호&#10;김태정&#10;조예린&#10;정영수&#10;강태경&#10;정명성"></textarea></div>
+  <div class="f"><label>관리자 비밀번호 (팀원 추가·삭제, 남의 할 일 삭제에 필요)</label><input type="password" id="setAdmin"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn primary" id="btnSetup">만들기</button></div>
+</div>
+
+<!-- 본문 -->
+<div class="wrap" id="app" hidden>
+  <section class="pane" id="leftPane">
+    <div class="eyebrow">공유 TEAM</div>
+    <div class="title-row"><h1 id="teamName">팀</h1><span class="badge" id="memberCount"></span><span class="spacer" style="flex:1"></span><button class="btn primary" id="btnAdd">+ TEAM 할 일 추가</button></div>
+    <div class="members" id="memberNames"></div>
+    <div class="quick">
+      <input type="text" id="qTitle" placeholder="TEAM 할 일 추가">
+      <input type="date" id="qDate" title="해야 하는 날짜">
+      <input type="time" id="qTime" title="해야 하는 시간">
+      <button class="btn primary" id="qAdd">추가</button>
+    </div>
+    <div id="openList"></div>
+  </section>
+  <div class="right">
+    <section class="pane">
+      <div class="cal-head"><h2>📅 <span id="calTitle"></span></h2><div class="cal-nav"><button id="calPrev">‹</button><button id="calToday">오늘</button><button id="calNext">›</button></div></div>
+      <div class="cal" id="cal"></div>
+      <div class="small-muted" style="margin-top:6px">날짜를 누르면 그 날의 할 일만 보이고, 추가할 때 그 날짜가 기본으로 들어갑니다. 다시 누르면 해제됩니다.</div>
+    </section>
+    <section class="pane" id="donePane">
+      <div class="done-head"><h2>완료된 일 <span class="badge" id="doneCount">0</span></h2><span class="spacer"></span><button class="gal" id="btnGallery">🖼 TEAM 사진과 완료 내역</button></div>
+      <div id="doneList"></div>
+    </section>
+  </div>
+</div>
+
+<!-- 할 일 추가/수정 모달 -->
+<div class="overlay" id="taskOverlay">
+  <div class="modal">
+    <h3><span id="taskModalTitle">TEAM 할 일 추가</span><button class="x" id="taskClose">×</button></h3>
+    <div class="f"><label>제목</label><input id="tTitle" placeholder="함께 처리할 할 일"></div>
+    <div class="f"><div class="row"><div><label>해야 하는 날짜</label><input type="date" id="tDate"></div><div><label>해야 하는 시간</label><input type="time" id="tTime"></div></div></div>
+    <div class="f"><label>마감일</label><input type="date" id="tDue"><div class="hint">지정하면 마감일 배지가 붙고, 지나면 빨갛게 표시됩니다.</div></div>
+    <div class="f check"><input type="checkbox" id="tImp"><label for="tImp" style="margin:0">중요 TEAM 할 일로 표시</label></div>
+    <div class="f"><label>상세 메모</label><textarea id="tMemo"></textarea></div>
+    <div class="f"><label>사진 <span class="small-muted">JPG·PNG·WEBP·GIF, 최대 5장 (자동으로 줄여 저장)</span></label>
+      <input type="file" id="tPhotos" accept="image/*" multiple hidden><button class="btn" id="tPick">🖼 사진 선택</button>
+      <div class="pick" id="tPickList"></div></div>
+    <div class="foot"><button class="btn" id="taskCancel">취소</button><button class="btn primary" id="taskSave">저장</button></div>
+  </div>
+</div>
+
+<!-- 설정 모달 -->
+<div class="overlay" id="adminOverlay">
+  <div class="modal">
+    <h3>설정 <button class="x" id="adminClose">×</button></h3>
+    <div id="adminLocked">
+      <div class="f"><label>관리자 비밀번호</label><input type="password" id="adminPw"></div>
+      <div class="foot"><button class="btn primary" id="adminUnlock">확인</button></div>
+    </div>
+    <div id="adminBody" hidden>
+      <div class="f"><label>팀 이름</label><input id="aTeam"></div>
+      <div class="f"><label>팀원</label><div class="admin-list" id="aMembers"></div>
+        <div style="display:flex;gap:8px;margin-top:8px"><input id="aNewMember" placeholder="새 팀원 이름"><button class="btn" id="aAddMember">추가</button></div>
+        <div class="hint">팀원을 빼도 예전 할 일의 완료 기록은 남습니다. PIN을 잊었으면 「PIN 초기화」를 누르세요.</div></div>
+      <div class="f"><label>관리자 비밀번호 바꾸기 (비우면 유지)</label><input type="password" id="aAdminPw"></div>
+      <div class="f"><label>저장 방식</label><div class="small-muted" id="aBackend"></div></div>
+      <div class="foot"><button class="btn primary" id="adminSave">저장</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="viewer" id="viewer"><img id="viewerImg" alt=""></div>
+<div class="toast" id="toast"></div>
+
+<!-- Firebase (설정 파일이 있을 때만 사용). team-config.js 가 window.TEAM_CONFIG 를 넣어 줍니다 -->
+<script src="team-config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+'use strict';
+/* ============================== 공통 ============================== */
+const $=(s,el=document)=>el.querySelector(s); const $$=(s,el=document)=>[...el.querySelectorAll(s)];
+const toast=(m,ms=2600)=>{ const t=$('#toast'); t.textContent=m; t.style.display='block'; clearTimeout(t._t); t._t=setTimeout(()=>t.style.display='none',ms); };
+const pad=n=>String(n).padStart(2,'0');
+const todayStr=()=>{ const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+const DOW=['일','월','화','수','목','금','토'];
+const fmtDate=s=>{ if(!s) return ''; const d=new Date(s+'T00:00:00'); return `${s.replace(/-/g,'.')} (${DOW[d.getDay()]})`; };
+const fmtDT=ms=>{ if(!ms) return ''; const d=new Date(ms); return `${d.getFullYear()}. ${d.getMonth()+1}. ${d.getDate()}. ${d.getHours()<12?'오전':'오후'} ${((d.getHours()+11)%12)+1}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+const fmtTime=ms=>{ const d=new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
+async function sha(s){ const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode('team:'+s)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ============================== 저장소 (Firestore 또는 브라우저) ============================== */
+/* 두 저장소가 같은 인터페이스: getTeam/setTeam/onTeam, listTasks(onTasks)/putTask/deleteTask, getPhotos/putPhotos/deletePhotos */
+const cfg=window.TEAM_CONFIG||{}; const TEAM_ID=cfg.teamId||'gyeongin1';
+let store=null;
+function makeFirestore(){
+  const app=firebase.initializeApp(cfg.firebase); const db=firebase.firestore(app);
+  const teamRef=db.collection('teams').doc(TEAM_ID); const tasksRef=teamRef.collection('tasks');
+  return {
+    kind:'Firebase Firestore (팀원 모두가 실시간 공유)',
+    onTeam(cb){ return teamRef.onSnapshot(s=>cb(s.exists?s.data():null), e=>{ console.error(e); toast('팀 정보를 읽지 못했습니다: '+e.message,5000); }); },
+    setTeam(data){ return teamRef.set(data,{merge:true}); },
+    onTasks(cb){ return tasksRef.onSnapshot(s=>cb(s.docs.map(d=>({id:d.id,...d.data()}))), e=>{ console.error(e); toast('할 일을 읽지 못했습니다: '+e.message,5000); }); },
+    putTask(t){ const {id,...rest}=t; return tasksRef.doc(id).set(rest); },
+    deleteTask(id){ return tasksRef.doc(id).delete(); },
+    async getPhotos(taskId){ const s=await tasksRef.doc(taskId).collection('photos').orderBy('order').get(); return s.docs.map(d=>({id:d.id,...d.data()})); },
+    async putPhotos(taskId, photos){ const col=tasksRef.doc(taskId).collection('photos'); const old=await col.get(); const keep=new Set(photos.map(p=>p.id)); for(const d of old.docs){ if(!keep.has(d.id)) await d.ref.delete(); } let i=0; for(const p of photos){ await col.doc(p.id).set({data:p.data, order:i++}); } },
+    async deletePhotos(taskId){ const col=tasksRef.doc(taskId).collection('photos'); const old=await col.get(); for(const d of old.docs) await d.ref.delete(); },
+  };
+}
+function makeLocal(){
+  const K='team.local.'+TEAM_ID; const load=()=>{ try{ return JSON.parse(localStorage.getItem(K)||'{}'); }catch(e){ return {}; } }; const save=d=>localStorage.setItem(K,JSON.stringify(d));
+  const subs={team:[],tasks:[]}; const fire=()=>{ const d=load(); subs.team.forEach(cb=>cb(d.team||null)); subs.tasks.forEach(cb=>cb(Object.values(d.tasks||{}))); };
+  window.addEventListener('storage',e=>{ if(e.key===K) fire(); });
+  return {
+    kind:'이 브라우저에만 저장 (체험 모드 · team-config.js 에 Firebase 설정을 넣으면 팀 공유로 바뀝니다)',
+    onTeam(cb){ subs.team.push(cb); setTimeout(()=>cb(load().team||null),0); return ()=>{}; },
+    async setTeam(data){ const d=load(); d.team={...(d.team||{}),...data}; save(d); fire(); },
+    onTasks(cb){ subs.tasks.push(cb); setTimeout(()=>cb(Object.values(load().tasks||{})),0); return ()=>{}; },
+    async putTask(t){ const d=load(); d.tasks=d.tasks||{}; d.tasks[t.id]=t; save(d); fire(); },
+    async deleteTask(id){ const d=load(); if(d.tasks) delete d.tasks[id]; if(d.photos) delete d.photos[id]; save(d); fire(); },
+    async getPhotos(id){ const d=load(); return (d.photos&&d.photos[id])||[]; },
+    async putPhotos(id, photos){ const d=load(); d.photos=d.photos||{}; d.photos[id]=photos.map((p,i)=>({id:p.id,data:p.data,order:i})); try{ save(d); }catch(e){ toast('브라우저 저장 용량이 부족합니다. 사진을 줄이세요.',5000); throw e; } fire(); },
+    async deletePhotos(id){ const d=load(); if(d.photos) delete d.photos[id]; save(d); },
+  };
+}
+
+/* ============================== 상태 ============================== */
+const state={ team:null, tasks:[], me:null, admin:false, calYM:null, selDay:null, showDone:true, photoCache:new Map(), unsub:[] };
+try{ const s=JSON.parse(localStorage.getItem('team.session.'+TEAM_ID)||'null'); if(s&&s.me) state.me=s.me; }catch(e){}
+const members=()=>((state.team&&state.team.members)||[]).filter(m=>!m.removed);
+const memberName=id=>{ const m=((state.team&&state.team.members)||[]).find(x=>x.id===id); return m?m.name:'(탈퇴)'; };
+const isDone=t=>{ const as=(t.assignees&&t.assignees.length)?t.assignees:members().map(m=>m.id); return as.length>0 && as.every(id=>t.completedBy&&t.completedBy[id]); };
+
+/* ============================== 시작 ============================== */
+async function boot(){
+  if(cfg.firebase && cfg.firebase.projectId && typeof firebase!=='undefined'){ try{ store=makeFirestore(); }catch(e){ console.error(e); toast('Firebase 설정 오류: '+e.message,6000); store=makeLocal(); } }
+  else store=makeLocal();
+  state.unsub.push(store.onTeam(team=>{ state.team=team; route(); }));
+  state.unsub.push(store.onTasks(tasks=>{ state.tasks=tasks; render(); }));
+}
+function route(){
+  const hasTeam=!!(state.team && state.team.members && state.team.members.length);
+  $('#setup').hidden=hasTeam; $('#login').hidden=!hasTeam || !!(state.me && members().some(m=>m.id===state.me));
+  const loggedIn=hasTeam && state.me && members().some(m=>m.id===state.me);
+  $('#app').hidden=!loggedIn;
+  $('#userBox').innerHTML = loggedIn ? `👤 <b>${esc(memberName(state.me))}</b> <small>${esc(state.team.name||'')}</small>` : '';
+  $('#btnLogout').hidden=!loggedIn; $('#btnAdmin').hidden=!hasTeam;
+  if(hasTeam && !loggedIn) renderLogin();
+  if(loggedIn) render();
+}
+/* ---- 팀 만들기 ---- */
+$('#btnSetup').onclick=async()=>{
+  const name=$('#setTeam').value.trim(); const names=$('#setMembers').value.split(/\n/).map(s=>s.trim()).filter(Boolean); const pw=$('#setAdmin').value;
+  if(!name||!names.length||!pw) return toast('팀 이름, 팀원, 관리자 비밀번호를 모두 넣으세요');
+  const ms=names.map(n=>({id:uid(), name:n})); await store.setTeam({name, members:ms, adminHash:await sha(pw), createdAt:Date.now()}); toast('팀을 만들었습니다');
+};
+/* ---- 로그인 ---- */
+let pickedMember=null;
+function renderLogin(){
+  const box=$('#loginNames'); box.innerHTML=''; $('#loginSub').textContent=`${state.team.name} 팀원 이름을 고르세요.`;
+  $('#loginNote').innerHTML = store.kind.startsWith('이 브라우저') ? '<div class="note">지금은 <b>체험 모드</b>입니다. 이 브라우저에만 저장되고 다른 팀원에게는 보이지 않습니다. 팀 공유를 켜려면 team-config.js에 Firebase 설정을 넣으세요.</div>' : '';
+  members().forEach(m=>{ const b=document.createElement('button'); b.textContent=m.name; b.className=pickedMember===m.id?'on':''; b.onclick=()=>{ pickedMember=m.id; renderLogin(); }; box.appendChild(b); });
+  const m=members().find(x=>x.id===pickedMember); $('#pinRow').hidden=!m; if(m){ $('#pin').placeholder = m.pinHash ? 'PIN 입력' : '처음이면 새 PIN을 정하세요 (4자리)'; }
+}
+$('#btnLogin').onclick=async()=>{
+  const m=members().find(x=>x.id===pickedMember); if(!m) return toast('이름을 고르세요');
+  const pin=$('#pin').value.trim(); if(!/^\d{4,8}$/.test(pin)) return toast('PIN은 숫자 4자리 이상');
+  const h=await sha(m.id+':'+pin);
+  if(m.pinHash){ if(m.pinHash!==h) return toast('PIN이 맞지 않습니다'); }
+  else { const ms=state.team.members.map(x=>x.id===m.id?{...x,pinHash:h}:x); await store.setTeam({members:ms}); toast('PIN을 저장했습니다'); }
+  state.me=m.id; localStorage.setItem('team.session.'+TEAM_ID, JSON.stringify({me:m.id})); $('#pin').value=''; route();
+};
+$('#btnLogout').onclick=()=>{ state.me=null; state.admin=false; localStorage.removeItem('team.session.'+TEAM_ID); pickedMember=null; route(); };
+
+/* ============================== 렌더 ============================== */
+function render(){
+  if($('#app').hidden) return;
+  $('#teamName').textContent=state.team.name||'팀'; $('#memberCount').textContent=members().length+'명';
+  $('#memberNames').innerHTML=members().map(m=>`<span>${esc(m.name)}</span>`).join('');
+  if(!$('#qDate').value) $('#qDate').value=state.selDay||todayStr();
+  renderOpen(); renderCal(); renderDone();
+}
+function taskSort(a,b){ return (a.date||'').localeCompare(b.date||'') || (a.time||'').localeCompare(b.time||'') || (a.createdAt||0)-(b.createdAt||0); }
+function taskEl(t, done){
+  const el=document.createElement('div'); el.className='task'+(done?' done':''); el.dataset.id=t.id;
+  const as=(t.assignees&&t.assignees.length)?t.assignees:members().map(m=>m.id);
+  const doneIds=as.filter(id=>t.completedBy&&t.completedBy[id]); const openIds=as.filter(id=>!(t.completedBy&&t.completedBy[id]));
+  const mine=!!(t.completedBy&&t.completedBy[state.me]);
+  const cb=document.createElement('button'); cb.className='cb'+(mine?' me':''); cb.title=mine?'내 완료 취소':'내 완료 표시'; cb.textContent=mine?'✓':''; cb.onclick=()=>toggleMine(t); el.appendChild(cb);
+  const star=document.createElement('button'); star.className='star'+(t.important?' on':''); star.textContent='★'; star.title='중요 표시'; star.onclick=()=>saveTask({...t, important:!t.important}); el.appendChild(star);
+  const body=document.createElement('div');
+  const over=t.due && !done && t.due<todayStr();
+  body.innerHTML=`<div class="when">${esc(fmtDate(t.date))}${t.time?`<small>${esc(t.time)}</small>`:''} <small>· TEAM 할 일</small></div>
+    <div class="tt"></div>
+    <div class="meta">${t.createdAt?esc(fmtTime(t.createdAt)):''} · ${esc(memberName(t.createdBy))} 등록${done&&t.doneAt?` · 최근 완료 ${esc(fmtDT(t.doneAt))}`:''}</div>
+    ${t.due?`<div class="chips"><span class="chip due${over?' over':''}">마감일 ${esc(fmtDate(t.due))}${over?' · 지남':''}</span></div>`:''}
+    <div class="chips"><span class="chip lab">완료자</span>${doneIds.length?doneIds.map(id=>`<span class="chip name ok">${esc(memberName(id))}</span>`).join(''):'<span class="chip name">없음</span>'}</div>
+    <div class="chips"><span class="chip lab b">미완료자</span>${openIds.length?openIds.map(id=>`<span class="chip name no">${esc(memberName(id))}</span>`).join(''):'<span class="chip name">없음</span>'}</div>
+    ${t.memo?`<div class="memo"></div>`:''}<div class="photos"></div>`;
+  body.querySelector('.tt').textContent=t.title||'(제목 없음)'; if(t.memo) body.querySelector('.memo').textContent=t.memo;
+  el.appendChild(body);
+  const acts=document.createElement('div'); acts.className='acts';
+  const canEdit = t.createdBy===state.me || state.admin;
+  const bE=document.createElement('button'); bE.className='btn small'; bE.textContent='수정'; bE.onclick=()=>openTaskModal(t); acts.appendChild(bE);
+  const bD=document.createElement('button'); bD.className='btn small danger'; bD.textContent='삭제'; bD.onclick=()=>{ if(!canEdit) return toast('등록한 사람이나 관리자만 삭제할 수 있습니다'); if(confirm('이 할 일을 삭제할까요?')) { store.deletePhotos(t.id).catch(()=>{}); store.deleteTask(t.id); } }; acts.appendChild(bD);
+  el.appendChild(acts);
+  if(t.photoCount){ loadPhotos(t.id).then(ps=>{ const box=body.querySelector('.photos'); box.innerHTML=''; ps.forEach(p=>{ const im=document.createElement('img'); im.src=p.data; im.alt=''; im.onclick=()=>{ $('#viewerImg').src=p.data; $('#viewer').classList.add('on'); }; box.appendChild(im); }); }); }
+  return el;
+}
+async function loadPhotos(id){ if(state.photoCache.has(id)) return state.photoCache.get(id); const p=await store.getPhotos(id).catch(()=>[]); state.photoCache.set(id,p); return p; }
+function renderOpen(){
+  const box=$('#openList'); box.innerHTML='';
+  let list=state.tasks.filter(t=>!isDone(t)); if(state.selDay) list=list.filter(t=>t.date===state.selDay);
+  list.sort(taskSort);
+  if(!list.length){ box.innerHTML=`<div class="empty">${state.selDay?esc(fmtDate(state.selDay))+'에 남아 있는 TEAM 할 일이 없습니다.':'남아 있는 TEAM 할 일이 없습니다.'}</div>`; return; }
+  let cur=null;
+  for(const t of list){ if(t.date!==cur){ cur=t.date; const h=document.createElement('div'); h.className='dayhead'; const isT=t.date===todayStr(); h.innerHTML=`<b>${esc(fmtDate(t.date))}</b>${isT?'<span class="badge">오늘</span>':''}<span class="cnt">${list.filter(x=>x.date===t.date).length}건</span>`; box.appendChild(h); } box.appendChild(taskEl(t,false)); }
+}
+function renderDone(){
+  $('#donePane').hidden=!state.showDone;
+  const box=$('#doneList'); box.innerHTML='';
+  let list=state.tasks.filter(isDone); if(state.selDay) list=list.filter(t=>t.date===state.selDay);
+  list.sort((a,b)=>(b.doneAt||0)-(a.doneAt||0)); $('#doneCount').textContent=list.length;
+  if(!list.length){ box.innerHTML='<div class="empty">완료된 일이 없습니다.</div>'; return; }
+  for(const t of list) box.appendChild(taskEl(t,true));
+}
+/* ---- 달력 ---- */
+function renderCal(){
+  const now=new Date(); if(!state.calYM) state.calYM=`${now.getFullYear()}-${pad(now.getMonth()+1)}`;
+  const [y,m]=state.calYM.split('-').map(Number); $('#calTitle').textContent=`${y}년 ${pad(m)}월`;
+  const first=new Date(y,m-1,1); const start=new Date(first); start.setDate(1-first.getDay());
+  const byDay={}; for(const t of state.tasks){ if(!t.date) continue; (byDay[t.date]=byDay[t.date]||[]).push(t); }
+  const cal=$('#cal'); cal.innerHTML=DOW.map(d=>`<div class="dow">${d}</div>`).join('');
+  const today=todayStr();
+  for(let i=0;i<42;i++){
+    const d=new Date(start); d.setDate(start.getDate()+i); const ds=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    const cell=document.createElement('div'); cell.className='day'+(d.getMonth()!==m-1?' out':'')+(ds===today?' today':'')+(ds===state.selDay?' sel':'');
+    const list=(byDay[ds]||[]).slice().sort(taskSort);
+    cell.innerHTML=`<div class="n">${d.getDate()}</div>`+list.slice(0,3).map(t=>`<div class="ev${isDone(t)?' done':''}${t.important?' imp':''}" title="${esc(t.title)}">${esc(t.title)}</div>`).join('')+(list.length>3?`<div class="more">+${list.length-3}</div>`:'');
+    cell.onclick=()=>{ state.selDay = state.selDay===ds ? null : ds; $('#qDate').value=state.selDay||todayStr(); render(); };
+    cal.appendChild(cell);
+  }
+}
+$('#calPrev').onclick=()=>{ const [y,m]=state.calYM.split('-').map(Number); const d=new Date(y,m-2,1); state.calYM=`${d.getFullYear()}-${pad(d.getMonth()+1)}`; renderCal(); };
+$('#calNext').onclick=()=>{ const [y,m]=state.calYM.split('-').map(Number); const d=new Date(y,m,1); state.calYM=`${d.getFullYear()}-${pad(d.getMonth()+1)}`; renderCal(); };
+$('#calToday').onclick=()=>{ state.calYM=null; state.selDay=null; render(); };
+$('#showDone').onchange=e=>{ state.showDone=e.target.checked; renderDone(); };
+$('#btnGallery').onclick=()=>{ document.querySelectorAll('#doneList .photos img').length ? $('#doneList').scrollIntoView({behavior:'smooth'}) : toast('완료된 일에 첨부된 사진이 없습니다'); };
+$('#viewer').onclick=()=>$('#viewer').classList.remove('on');
+
+/* ============================== 할 일 저장/완료 ============================== */
+async function saveTask(t){ await store.putTask(t); }
+async function toggleMine(t){
+  const cb={...(t.completedBy||{})}; if(cb[state.me]) delete cb[state.me]; else cb[state.me]=Date.now();
+  const nt={...t, completedBy:cb}; const nowDone=isDone(nt); nt.done=nowDone; nt.doneAt = nowDone ? (t.doneAt&&t.done?t.doneAt:Date.now()) : null;
+  await saveTask(nt);
+  if(nowDone) toast('팀원 모두 완료 → 완료된 일로 이동했습니다'); else if(cb[state.me]) toast(`내 완료 표시 (${Object.keys(cb).length}/${(nt.assignees||members().map(m=>m.id)).length}명)`);
+}
+/* ---- 빠른 추가 ---- */
+$('#qAdd').onclick=async()=>{ const title=$('#qTitle').value.trim(); if(!title) return toast('할 일을 입력하세요'); await createTask({title, date:$('#qDate').value||todayStr(), time:$('#qTime').value||'', due:'', important:false, memo:''}, []); $('#qTitle').value=''; $('#qTime').value=''; };
+$('#qTitle').onkeydown=e=>{ if(e.key==='Enter') $('#qAdd').click(); };
+async function createTask(fields, photos){
+  const t={id:uid(), ...fields, createdBy:state.me, createdAt:Date.now(), assignees:members().map(m=>m.id), completedBy:{}, done:false, doneAt:null, photoCount:photos.length};
+  await saveTask(t); if(photos.length){ await store.putPhotos(t.id, photos); state.photoCache.delete(t.id); } toast('추가했습니다');
+}
+/* ---- 모달 ---- */
+let editing=null, pickPhotos=[];
+function openTaskModal(t){
+  editing=t||null; $('#taskModalTitle').textContent=t?'TEAM 할 일 수정':'TEAM 할 일 추가';
+  $('#tTitle').value=t?t.title:''; $('#tDate').value=t?t.date:(state.selDay||todayStr()); $('#tTime').value=t?(t.time||''):''; $('#tDue').value=t?(t.due||''):''; $('#tImp').checked=!!(t&&t.important); $('#tMemo').value=t?(t.memo||''):'';
+  pickPhotos=[]; renderPick(); if(t&&t.photoCount){ loadPhotos(t.id).then(ps=>{ pickPhotos=ps.map(p=>({id:p.id,data:p.data})); renderPick(); }); }
+  $('#taskOverlay').classList.add('on'); setTimeout(()=>$('#tTitle').focus(),50);
+}
+function closeTaskModal(){ $('#taskOverlay').classList.remove('on'); editing=null; }
+$('#btnAdd').onclick=()=>openTaskModal(null); $('#taskClose').onclick=closeTaskModal; $('#taskCancel').onclick=closeTaskModal;
+$('#tPick').onclick=()=>$('#tPhotos').click();
+$('#tPhotos').onchange=async e=>{ const files=[...e.target.files]; e.target.value=''; for(const f of files){ if(pickPhotos.length>=5){ toast('사진은 최대 5장'); break; } if(!/^image\//.test(f.type)){ toast('이미지 파일만'); continue; } try{ const data=await shrinkImage(f); pickPhotos.push({id:uid(), data}); }catch(err){ toast('사진을 읽지 못했습니다'); } } renderPick(); };
+function renderPick(){ const box=$('#tPickList'); box.innerHTML=''; pickPhotos.forEach((p,i)=>{ const d=document.createElement('div'); d.className='ph'; const im=document.createElement('img'); im.src=p.data; const b=document.createElement('button'); b.textContent='×'; b.onclick=()=>{ pickPhotos.splice(i,1); renderPick(); }; d.append(im,b); box.appendChild(d); }); }
+async function shrinkImage(file){ // 최대 1280px, JPEG로 줄여 ~300KB 이하로
+  const img=await new Promise((res,rej)=>{ const u=URL.createObjectURL(file); const i=new Image(); i.onload=()=>{ URL.revokeObjectURL(u); res(i); }; i.onerror=rej; i.src=u; });
+  let w=img.naturalWidth, h=img.naturalHeight; const max=1280; if(Math.max(w,h)>max){ const r=max/Math.max(w,h); w=Math.round(w*r); h=Math.round(h*r); }
+  const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
+  let q=0.82, data=c.toDataURL('image/jpeg',q); while(data.length>420000 && q>0.4){ q-=0.1; data=c.toDataURL('image/jpeg',q); }
+  if(data.length>700000){ const c2=document.createElement('canvas'); c2.width=Math.round(w*0.7); c2.height=Math.round(h*0.7); c2.getContext('2d').drawImage(img,0,0,c2.width,c2.height); data=c2.toDataURL('image/jpeg',0.6); }
+  return data;
+}
+$('#taskSave').onclick=async()=>{
+  const title=$('#tTitle').value.trim(); if(!title) return toast('제목을 입력하세요');
+  const fields={title, date:$('#tDate').value||todayStr(), time:$('#tTime').value||'', due:$('#tDue').value||'', important:$('#tImp').checked, memo:$('#tMemo').value.trim()};
+  $('#taskSave').disabled=true;
+  try{
+    if(editing){ const nt={...editing, ...fields, photoCount:pickPhotos.length}; await saveTask(nt); await store.putPhotos(editing.id, pickPhotos); state.photoCache.delete(editing.id); toast('수정했습니다'); }
+    else await createTask(fields, pickPhotos);
+    closeTaskModal();
+  }catch(e){ console.error(e); toast('저장 실패: '+(e.message||e),5000); }
+  finally{ $('#taskSave').disabled=false; }
+};
+
+/* ============================== 설정(관리자) ============================== */
+$('#btnAdmin').onclick=()=>{ $('#adminOverlay').classList.add('on'); $('#adminLocked').hidden=state.admin; $('#adminBody').hidden=!state.admin; if(state.admin) renderAdmin(); };
+$('#adminClose').onclick=()=>$('#adminOverlay').classList.remove('on');
+$('#adminUnlock').onclick=async()=>{ const h=await sha($('#adminPw').value); if(h!==state.team.adminHash) return toast('비밀번호가 맞지 않습니다'); state.admin=true; $('#adminPw').value=''; $('#adminLocked').hidden=true; $('#adminBody').hidden=false; renderAdmin(); toast('관리자 모드'); render(); };
+function renderAdmin(){
+  $('#aTeam').value=state.team.name||''; $('#aBackend').textContent=store.kind;
+  const box=$('#aMembers'); box.innerHTML='';
+  (state.team.members||[]).forEach(m=>{ const d=document.createElement('div'); d.className='m'; d.innerHTML=`<b>${esc(m.name)}${m.removed?' <span class="small-muted">(제외됨)</span>':''}</b>`;
+    const b1=document.createElement('button'); b1.className='btn small'; b1.textContent='PIN 초기화'; b1.onclick=async()=>{ await store.setTeam({members:state.team.members.map(x=>x.id===m.id?{...x,pinHash:null}:x)}); toast('PIN을 지웠습니다. 다음 로그인 때 새로 정합니다'); };
+    const b2=document.createElement('button'); b2.className='btn small'+(m.removed?'':' danger'); b2.textContent=m.removed?'복귀':'제외'; b2.onclick=async()=>{ await store.setTeam({members:state.team.members.map(x=>x.id===m.id?{...x,removed:!m.removed}:x)}); };
+    d.append(b1,b2); box.appendChild(d); });
+}
+$('#aAddMember').onclick=async()=>{ const n=$('#aNewMember').value.trim(); if(!n) return; await store.setTeam({members:[...(state.team.members||[]),{id:uid(),name:n}]}); $('#aNewMember').value=''; toast('추가했습니다'); };
+$('#adminSave').onclick=async()=>{ const data={name:$('#aTeam').value.trim()||state.team.name}; const pw=$('#aAdminPw').value; if(pw) data.adminHash=await sha(pw); await store.setTeam(data); $('#aAdminPw').value=''; toast('저장했습니다'); };
+$('#adminOverlay').addEventListener('click',e=>{ if(e.target.id==='adminOverlay') $('#adminOverlay').classList.remove('on'); });
+$('#taskOverlay').addEventListener('click',e=>{ if(e.target.id==='taskOverlay') closeTaskModal(); });
+
+boot();
+</script>
+</body>
+</html>
