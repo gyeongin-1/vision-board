@@ -14,7 +14,7 @@
 *{box-sizing:border-box} html,body{margin:0;padding:0}
 body{background:var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
 button,input,select,textarea{font:inherit;color:inherit} button{cursor:pointer}
-.hidden{display:none!important}
+.hidden{display:none!important} [hidden]{display:none!important}
 
 /* 상단 바 */
 .top{background:var(--navy);color:#fff;display:flex;align-items:center;gap:14px;padding:0 18px;height:56px;position:sticky;top:0;z-index:20}
@@ -153,7 +153,12 @@ button,input,select,textarea{font:inherit;color:inherit} button{cursor:pointer}
   <h1>팀 만들기</h1>
   <p>처음 한 번만 합니다. 팀 이름, 팀원, 관리자 비밀번호를 정하세요.</p>
   <div class="f"><label>팀 이름</label><input id="setTeam" value="경인1"></div>
-  <div class="f"><label>팀원 (한 줄에 한 명)</label><textarea id="setMembers" placeholder="최주호&#10;김태정&#10;조예린&#10;정영수&#10;강태경&#10;정명성"></textarea></div>
+  <div class="f"><label>팀원 (한 줄에 한 명 · 필요하면 고치세요)</label><textarea id="setMembers" placeholder="예) 홍길동">최주호
+김태정
+조예린
+정영수
+강태경
+정명성</textarea></div>
   <div class="f"><label>관리자 비밀번호 (팀원 추가·삭제, 남의 할 일 삭제에 필요)</label><input type="password" id="setAdmin"></div>
   <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn primary" id="btnSetup">만들기</button></div>
 </div>
@@ -306,7 +311,9 @@ function route(){
 /* ---- 팀 만들기 ---- */
 $('#btnSetup').onclick=async()=>{
   const name=$('#setTeam').value.trim(); const names=$('#setMembers').value.split(/\n/).map(s=>s.trim()).filter(Boolean); const pw=$('#setAdmin').value;
-  if(!name||!names.length||!pw) return toast('팀 이름, 팀원, 관리자 비밀번호를 모두 넣으세요');
+  if(!name){ $('#setTeam').focus(); return toast('팀 이름을 넣으세요'); }
+  if(!names.length){ $('#setMembers').focus(); return toast('팀원 이름을 한 줄에 한 명씩 직접 입력하세요 (회색 글씨는 예시입니다)'); }
+  if(pw.length<4){ $('#setAdmin').focus(); return toast('관리자 비밀번호를 4자 이상 넣으세요'); }
   const ms=names.map(n=>({id:uid(), name:n})); await store.setTeam({name, members:ms, adminHash:await sha(pw), createdAt:Date.now()}); toast('팀을 만들었습니다');
 };
 /* ---- 로그인 ---- */
