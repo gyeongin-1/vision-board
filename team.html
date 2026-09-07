@@ -146,6 +146,9 @@ button,input,select,textarea{font:inherit;color:inherit} button{cursor:pointer}
   <div class="names" id="loginNames"></div>
   <div class="f" id="pinRow" hidden><label>PIN (4자리)</label><input type="password" id="pin" inputmode="numeric" maxlength="8" placeholder="처음이면 새 PIN을 정하세요"></div>
   <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn primary" id="btnLogin">들어가기</button></div>
+  <hr style="border:0;border-top:1px solid var(--grid);margin:18px 0 12px">
+  <div class="small-muted" style="margin-bottom:6px">팀장(관리자)은 이름을 고르지 않고 비밀번호로 들어갑니다. 관리자는 완료 체크 대상에 포함되지 않습니다.</div>
+  <div style="display:flex;gap:8px"><input type="password" id="adminLoginPw" placeholder="관리자 비밀번호" style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:9px"><button class="btn" id="btnAdminLogin">관리자로 들어가기</button></div>
 </div>
 
 <!-- 첫 설정 (팀 만들기) -->
@@ -288,7 +291,9 @@ function makeLocal(){
 const state={ team:null, tasks:[], me:null, admin:false, calYM:null, selDay:null, showDone:true, photoCache:new Map(), unsub:[] };
 try{ const s=JSON.parse(localStorage.getItem('team.session.'+TEAM_ID)||'null'); if(s&&s.me) state.me=s.me; }catch(e){}
 const members=()=>((state.team&&state.team.members)||[]).filter(m=>!m.removed);
-const memberName=id=>{ const m=((state.team&&state.team.members)||[]).find(x=>x.id===id); return m?m.name:'(탈퇴)'; };
+const ADMIN_ID='__admin__';
+const isAdminUser=()=>state.me===ADMIN_ID;
+const memberName=id=>{ if(id===ADMIN_ID) return '관리자'; const m=((state.team&&state.team.members)||[]).find(x=>x.id===id); return m?m.name:'(탈퇴)'; };
 const isDone=t=>{ const as=(t.assignees&&t.assignees.length)?t.assignees:members().map(m=>m.id); return as.length>0 && as.every(id=>t.completedBy&&t.completedBy[id]); };
 
 /* ============================== 시작 ============================== */
@@ -300,10 +305,12 @@ async function boot(){
 }
 function route(){
   const hasTeam=!!(state.team && state.team.members && state.team.members.length);
-  $('#setup').hidden=hasTeam; $('#login').hidden=!hasTeam || !!(state.me && members().some(m=>m.id===state.me));
-  const loggedIn=hasTeam && state.me && members().some(m=>m.id===state.me);
+  const known = state.me && (isAdminUser() || members().some(m=>m.id===state.me));
+  if(isAdminUser()) state.admin=true;
+  $('#setup').hidden=hasTeam; $('#login').hidden=!hasTeam || !!known;
+  const loggedIn=hasTeam && known;
   $('#app').hidden=!loggedIn;
-  $('#userBox').innerHTML = loggedIn ? `👤 <b>${esc(memberName(state.me))}</b> <small>${esc(state.team.name||'')}</small>` : '';
+  $('#userBox').innerHTML = loggedIn ? `👤 <b>${esc(memberName(state.me))}</b> <small>${esc(state.team.name||'')}${isAdminUser()?' · 관리자':''}</small>` : '';
   $('#btnLogout').hidden=!loggedIn; $('#btnAdmin').hidden=!hasTeam;
   if(hasTeam && !loggedIn) renderLogin();
   if(loggedIn) render();
@@ -333,6 +340,12 @@ $('#btnLogin').onclick=async()=>{
   state.me=m.id; localStorage.setItem('team.session.'+TEAM_ID, JSON.stringify({me:m.id})); $('#pin').value=''; route();
 };
 $('#btnLogout').onclick=()=>{ state.me=null; state.admin=false; localStorage.removeItem('team.session.'+TEAM_ID); pickedMember=null; route(); };
+$('#btnAdminLogin').onclick=async()=>{
+  const pw=$('#adminLoginPw').value; if(!pw) return toast('관리자 비밀번호를 넣으세요');
+  if((await sha(pw))!==state.team.adminHash) return toast('비밀번호가 맞지 않습니다');
+  state.me=ADMIN_ID; state.admin=true; localStorage.setItem('team.session.'+TEAM_ID, JSON.stringify({me:ADMIN_ID})); $('#adminLoginPw').value=''; toast('관리자로 들어왔습니다'); route();
+};
+$('#adminLoginPw').onkeydown=e=>{ if(e.key==='Enter') $('#btnAdminLogin').click(); };
 
 /* ============================== 렌더 ============================== */
 function render(){
@@ -348,7 +361,9 @@ function taskEl(t, done){
   const as=(t.assignees&&t.assignees.length)?t.assignees:members().map(m=>m.id);
   const doneIds=as.filter(id=>t.completedBy&&t.completedBy[id]); const openIds=as.filter(id=>!(t.completedBy&&t.completedBy[id]));
   const mine=!!(t.completedBy&&t.completedBy[state.me]);
-  const cb=document.createElement('button'); cb.className='cb'+(mine?' me':''); cb.title=mine?'내 완료 취소':'내 완료 표시'; cb.textContent=mine?'✓':''; cb.onclick=()=>toggleMine(t); el.appendChild(cb);
+  const cb=document.createElement('button'); cb.className='cb'+(mine?' me':''); cb.title=mine?'내 완료 취소':'내 완료 표시'; cb.textContent=mine?'✓':''; cb.onclick=()=>toggleMine(t);
+  if(isAdminUser()){ cb.disabled=true; cb.style.opacity='.35'; cb.style.cursor='default'; cb.title='관리자는 완료 체크 대상이 아닙니다 (팀원 전원 완료 시 자동 완료)'; }
+  el.appendChild(cb);
   const star=document.createElement('button'); star.className='star'+(t.important?' on':''); star.textContent='★'; star.title='중요 표시'; star.onclick=()=>saveTask({...t, important:!t.important}); el.appendChild(star);
   const body=document.createElement('div');
   const over=t.due && !done && t.due<todayStr();
