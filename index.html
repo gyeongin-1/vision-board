@@ -118,6 +118,8 @@ svg.chart .hbar{fill:var(--s1);cursor:pointer}
 svg.chart .hbar.dim{opacity:.35}
 svg.chart .hlabel{fill:var(--ink);font-size:12px}
 svg.chart .hval{fill:var(--ink-2);font-size:11.5px}
+svg.chart .hpct{font-size:11px;font-weight:700;fill:var(--muted)} svg.chart .hpct.up{fill:var(--up)} svg.chart .hpct.down{fill:var(--down)}
+svg.chart .lbl.pct{font-weight:700} svg.chart .lbl.pct.up{fill:var(--up)} svg.chart .lbl.pct.down{fill:var(--down)}
 svg.chart .line{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
 svg.chart .dot{stroke:var(--surface);stroke-width:2}
 svg.chart .xh{stroke:var(--axis);stroke-dasharray:3 3}
@@ -688,10 +690,10 @@ body:not(.viewer) .viewer-only{display:none!important}
         <button class="chip" data-p="all">전체</button>
       </span>
       <span class="badge" id="periodAuto" style="background:var(--accent-soft);color:var(--accent);border-color:var(--accent)">자동 갱신</span>
-      <span class="msel" id="ms-office" hidden></span>
-      <span class="msel" id="ms-rep"></span>
-      <span class="msel" id="ms-client"></span>
-      <span class="msel" id="ms-product"></span>
+      <span class="msel" id="ms-office" data-dim="office" hidden></span>
+      <span class="msel" id="ms-rep" data-dim="rep"></span>
+      <span class="msel" id="ms-client" data-dim="client"></span>
+      <span class="msel" id="ms-product" data-dim="product"></span>
       <span class="label" style="margin-left:6px">단위</span>
       <span class="seg" id="unitSeg"><button data-u="1" class="on">천원</button><button data-u="1000">백만원</button></span>
       <button class="btn small" id="btnReset">필터 초기화</button>
@@ -742,6 +744,7 @@ body:not(.viewer) .viewer-only{display:none!important}
           <button class="chip" data-t="close">모두 접기</button>
         </span>
         <button class="chip mobile-only" id="btnCompact" title="모바일에서는 기본으로 전월·최근월·증감만 보여 줍니다">전체 월 보기</button>
+        <span class="msel" data-dim="rep"></span><span class="msel" data-dim="client"></span><span class="msel" data-dim="product"></span>
         <span class="label" id="dimLabel">행 기준</span>
         <span class="chips" id="dimChips">
           <button class="chip" data-d="office">사무소</button>
@@ -1577,11 +1580,11 @@ function optionsFor(dim){
 }
 
 /* multi-select component */
-function buildMsel(dim){
-  const host=$('#ms-'+dim); host.innerHTML='';
+function buildMsel(host){
+  const dim=host.dataset.dim; host.innerHTML='';
   const btn=document.createElement('button'); btn.className='btn'; host.appendChild(btn);
   const render=()=>{ const s=state.f[dim]; btn.innerHTML=''; const l=document.createElement('span'); l.textContent=DIM_LABEL[dim]+': '; l.style.color='var(--muted)'; const v=document.createElement('span'); v.className='v';
-    if(!s) v.textContent='전체'; else { const arr=[...s]; v.textContent=arr.length===1?arr[0]:`${arr[0]} 외 ${arr.length-1}`; }
+    if(!s) v.textContent='전체'; else { const arr=[...s]; v.textContent=arr.length===0?'없음':arr.length===1?arr[0]:`${arr[0]} 외 ${arr.length-1}`; }
     btn.append(l,v,document.createTextNode(' ▾')); btn.classList.toggle('active',!!s); };
   render(); host._render=render;
   btn.onclick=(e)=>{ e.stopPropagation(); if(host.querySelector('.pop')) return closePops(); closePops(); openPop(host,dim); };
@@ -1608,7 +1611,7 @@ function openPop(host, dim){
   bOnly.onclick=()=>{ sel.clear(); (list._show||[]).forEach(o=>sel.add(o[0])); draw(); apply(); };
   inp.oninput=draw; draw(); host.appendChild(pop); if(!document.body.classList.contains('mobile')) inp.focus(); // 모바일은 키보드가 올라와 목록을 가리므로 자동 포커스 안 함
 }
-function refreshMsels(){ for(const d of DIMS){ const host=$('#ms-'+d); if(host._render) host._render(); } }
+function refreshMsels(){ for(const host of $$('.msel[data-dim]')){ if(host._render) host._render(); } }
 
 /* ============================== 렌더 ============================== */
 function renderStatus(){
@@ -1685,7 +1688,7 @@ function aggregate(){
   const res={types:{}, monthsInRange: state.months.filter(m=>m>=state.f.from&&m<=state.f.to)};
   for(const t of activeTypes()){
     const d=state.data[t]; const idx=monthRange(t); const ms=idx.map(i=>d.months[i]);
-    const monthly=new Map(ms.map(m=>[m,0])); const byRep=new Map(), byProd=new Map(); const rows=[];
+    const monthly=new Map(ms.map(m=>[m,0])); const byRep=new Map(), byProd=new Map(), byRepPrev=new Map(), byProdPrev=new Map(); const rows=[];
     let total=0; const clients=new Set(), reps=new Set();
     // 이 유형에 실제 데이터가 있는 마지막 달을 최근월로 (예: WAD는 7월까지, 평가실적은 6월까지인 경우)
     const lastM=ms.length?ms[ms.length-1]:res.monthsInRange[res.monthsInRange.length-1]; const prevM=ymAdd(lastM,-1), yoyM=ymAdd(lastM,-12);
@@ -1698,9 +1701,10 @@ function aggregate(){
       rows.push(r);
       const lv=li>=0?r.v[li]:0; // 담당자별·품목별 막대는 최근월 기준
       if(lv!==0){ byRep.set(r.rep,(byRep.get(r.rep)||0)+lv); if(r.product!==ADJ_PRODUCT) byProd.set(r.product,(byProd.get(r.product)||0)+lv); }
+      const pv=pi>=0?r.v[pi]:0; if(pv!==0){ byRepPrev.set(r.rep,(byRepPrev.get(r.rep)||0)+pv); if(r.product!==ADJ_PRODUCT) byProdPrev.set(r.product,(byProdPrev.get(r.product)||0)+pv); }
       if(s!==0){ total+=s; if(r.product!==ADJ_PRODUCT) clients.add(r.client); reps.add(r.rep); }
     }
-    res.types[t]={idx, ms, monthly, byRep, byProd, rows, total, clients:clients.size, reps:reps.size, lastM, lastV, prevV:pi>=0?prevV:null, yoyV:yi>=0?yoyV:null, activeClients:activeClients.size, hasLast:li>=0};
+    res.types[t]={idx, ms, monthly, byRep, byProd, byRepPrev, byProdPrev, rows, total, clients:clients.size, reps:reps.size, lastM, lastV, prevV:pi>=0?prevV:null, yoyV:yi>=0?yoyV:null, activeClients:activeClients.size, hasLast:li>=0};
   }
   return res;
 }
@@ -1726,7 +1730,7 @@ function renderKpis(agg){
 /* ---- 차트 유틸 ---- */
 const NS='http://www.w3.org/2000/svg';
 function svgEl(tag, attrs, parent){ const el=document.createElementNS(NS,tag); for(const k in attrs) el.setAttribute(k,attrs[k]); if(parent) parent.appendChild(el); return el; }
-function niceMax(v){ if(v<=0) return 1; const p=Math.pow(10,Math.floor(Math.log10(v))); const f=v/p; const n=f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10; return n*p; }
+function niceMax(v){ if(v<=0) return 1; v=v*1.06; const p=Math.pow(10,Math.floor(Math.log10(v))); const f=v/p; const n=[1,1.2,1.5,2,2.5,3,4,5,6,8,10].find(s=>f<=s)||10; return n*p; }
 function axisFmt(v){ const u=state.unit; if(u===1000) return (v/1000).toLocaleString('ko-KR',{maximumFractionDigits:1}); if(v>=1e6) return (v/1e6).toFixed(1)+'백만'; if(v>=1e4) return Math.round(v/1000)+'천'; return fmtInt(v); }
 const tip=$('#tip');
 function showTip(x,y,html){ tip.innerHTML=html; tip.style.display='block'; const r=tip.getBoundingClientRect(); let L=x+14, T=y+14; if(L+r.width>innerWidth-8) L=x-r.width-14; if(T+r.height>innerHeight-8) T=y-r.height-14; tip.style.left=L+'px'; tip.style.top=T+'px'; }
@@ -1761,7 +1765,9 @@ function renderTrend(agg){
       const hit=svgEl('rect',{x:x(i)-bw/2-3,y:padT,width:bw+6,height:H-padT-padB,fill:'transparent'},svg);
       hit.addEventListener('pointermove',e=>showTip(e.clientX,e.clientY,`<div class="h">${ymLong(months[i])}</div>${tipRow(series[0].hex,TYPE_LABEL[state.mode],fmtVal(val)+' '+unitName())}${i>0&&v[i-1]!=null?`<div class="h" style="margin-top:3px">전월 대비 ${fmtPct(pct(val,v[i-1]))}</div>`:''}`));
       hit.addEventListener('pointerleave',hideTip);
-      if(i===months.length-1||i===maxIdx){ const t=svgEl('text',{x:x(i),y:y(val)-6,'text-anchor':'middle',class:'lbl'},svg); t.textContent=fmtVal(val); }
+      const g=i>0&&v[i-1]!=null&&v[i-1]!==0?pct(val,v[i-1]):null; const showPct=g!=null&&(bw>=26||i===months.length-1);
+      if(showPct){ const t2=svgEl('text',{x:x(i),y:y(val)-6,'text-anchor':'middle',class:'lbl pct '+(g>0?'up':g<0?'down':'')},svg); t2.textContent=fmtPct(g); }
+      if(i===months.length-1||i===maxIdx){ const t=svgEl('text',{x:x(i),y:y(val)-(showPct?19:6),'text-anchor':'middle',class:'lbl'},svg); t.textContent=fmtVal(val); }
     });
   } else {
     series.forEach((s,si)=>{ const v=vals[si]; let d=''; v.forEach((val,i)=>{ if(val==null) return; d+=(d?'L':'M')+x(i)+','+y(val); });
@@ -1778,16 +1784,16 @@ function renderTrend(agg){
     hit.addEventListener('pointerleave',()=>{ hideTip(); xh.setAttribute('opacity',0); });
     // 월별 비교 표
     const tb=document.createElement('table'); tb.className='mini';
-    tb.innerHTML='<thead><tr><th>월</th><th>WAD</th><th>평가실적</th><th>차이</th><th>차이율</th></tr></thead>';
+    tb.innerHTML='<thead><tr><th>월</th><th>WAD</th><th>평가실적</th><th>평가 전월대비</th><th>차이</th><th>차이율</th></tr></thead>';
     const body=document.createElement('tbody');
-    months.forEach((m,i)=>{ const w=vals[0][i], ev=vals[1][i]; const tr=document.createElement('tr'); tr.innerHTML=`<td>${ymLong(m)}</td><td>${w==null?'-':fmtVal(w)}</td><td>${ev==null?'-':fmtVal(ev)}</td><td>${w!=null&&ev!=null?deltaHtml(ev,w).replace(/\(.*\)/,''):'-'}</td><td>${w!=null&&ev!=null?fmtPct(pct(ev,w)):'-'}</td>`; body.appendChild(tr); });
+    months.forEach((m,i)=>{ const w=vals[0][i], ev=vals[1][i]; const tr=document.createElement('tr'); tr.innerHTML=`<td>${ymLong(m)}</td><td>${w==null?'-':fmtVal(w)}</td><td>${ev==null?'-':fmtVal(ev)}</td><td>${(i>0&&ev!=null&&vals[1][i-1])?`<span class="${ev>=vals[1][i-1]?'up':'down'}">${fmtPct(pct(ev,vals[1][i-1]))}</span>`:'-'}</td><td>${w!=null&&ev!=null?deltaHtml(ev,w).replace(/\(.*\)/,''):'-'}</td><td>${w!=null&&ev!=null?fmtPct(pct(ev,w)):'-'}</td>`; body.appendChild(tr); });
     tb.appendChild(body); $('#cmpTable').appendChild(tb);
   }
 }
-function renderHBars(host, entries, {onClick, dimKey, sub}){
+function renderHBars(host, entries, {onClick, dimKey, sub, prev}){
   host.innerHTML='';
   if(!entries.length){ host.innerHTML='<div class="sub">데이터 없음</div>'; return; }
-  const W=Math.max(240,host.clientWidth||300), rowH=26, padL=Math.min(140,Math.max(70,Math.max(...entries.map(e=>e[0].length))*11)), padR=70, H=entries.length*rowH+6;
+  const W=Math.max(240,host.clientWidth||300), rowH=26, padL=Math.min(140,Math.max(70,Math.max(...entries.map(e=>e[0].length))*11)), padR=prev?118:70, H=entries.length*rowH+6;
   const svg=svgEl('svg',{class:'chart',viewBox:`0 0 ${W} ${H}`,height:H},host);
   const maxV=Math.max(1,...entries.map(e=>Math.abs(e[1])));
   const selSet=state.f[dimKey];
@@ -1795,8 +1801,9 @@ function renderHBars(host, entries, {onClick, dimKey, sub}){
     const t=svgEl('text',{x:padL-8,y:yy+rowH/2+4,'text-anchor':'end',class:'hlabel'},svg); t.textContent=name.length>14?name.slice(0,13)+'…':name;
     const bar=svgEl('path',{class:'hbar'+(selSet&&!selSet.has(name)?' dim':''),d:w<=0?'':`M${padL},${yy+4} h${w-r} a${r},${r} 0 0 1 ${r},${r} v${rowH-8-2*r} a${r},${r} 0 0 1 ${-r},${r} h${-(w-r)} z`},svg);
     const v=svgEl('text',{x:padL+w+6,y:yy+rowH/2+4,class:'hval'},svg); v.textContent=fmtVal(val);
+    if(prev){ const p0=prev.get(name)||0; const g=pct(val,p0); const gt=svgEl('text',{x:padL+w+6+String(fmtVal(val)).length*7.2+6,y:yy+rowH/2+4,class:'hpct '+(g==null?'':g>0?'up':g<0?'down':'')},svg); gt.textContent = p0===0 ? (val>0?'신규':'') : fmtPct(g); }
     const hit=svgEl('rect',{x:0,y:yy,width:W,height:rowH,fill:'transparent',style:'cursor:pointer'},svg);
-    hit.addEventListener('pointermove',e=>showTip(e.clientX,e.clientY,`<div class="h">${esc(name)}</div><b>${fmtVal(val)} ${unitName()}</b><div class="h">클릭하면 필터 적용/해제</div>`));
+    hit.addEventListener('pointermove',e=>showTip(e.clientX,e.clientY,`<div class="h">${esc(name)}</div><b>${fmtVal(val)} ${unitName()}</b>${prev?`<div class="h" style="margin-top:3px">전월 ${fmtVal(prev.get(name)||0)} · 전월 대비 ${deltaHtml(val,prev.get(name)||0)}</div>`:''}<div class="h">클릭하면 필터 적용/해제</div>`));
     hit.addEventListener('pointerleave',hideTip); hit.addEventListener('click',()=>onClick(name));
   });
 }
@@ -1807,8 +1814,8 @@ function renderRanks(agg){
   $('#repSub').textContent=(state.mode==='CMP'?'평가실적 · ':'')+`${ymLong(a.lastM)} 기준, ${unitName()}`;
   $('#prodSub').textContent=(state.mode==='CMP'?'평가실적 · ':'')+`${ymLabel(a.lastM)} 상위 10개 / 전체 ${a.byProd.size}개`;
   const toggle=(dim,name)=>{ const s=state.f[dim]; if(s&&s.size===1&&s.has(name)) state.f[dim]=null; else state.f[dim]=new Set([name]); renderAll(); };
-  renderHBars($('#byRep'),reps,{dimKey:'rep',onClick:n=>toggle('rep',n)});
-  renderHBars($('#byProduct'),prods,{dimKey:'product',onClick:n=>toggle('product',n)});
+  renderHBars($('#byRep'),reps,{dimKey:'rep',onClick:n=>toggle('rep',n),prev:a.prevV!=null?a.byRepPrev:null});
+  renderHBars($('#byProduct'),prods,{dimKey:'product',onClick:n=>toggle('product',n),prev:a.prevV!=null?a.byProdPrev:null});
 }
 /* ---- 표 ---- */
 let lastTableRows=[];
@@ -2806,7 +2813,7 @@ document.addEventListener('drop', async e=>{ e.preventDefault(); const items=[..
   if(dirs.length){ state.dirHandle=dirs[0]; state.dirName=dirs[0].name; await idb.set('dir',dirs[0]); return refreshFromDir(); }
   if(files.length) loadFiles(files); });
 }
-DIMS.forEach(buildMsel);
+$$('.msel[data-dim]').forEach(buildMsel);
 window.__tb={loadFiles, state, aggregate, buildBundle, applyBundle, encryptBundle, decryptEnvelope};
 if(!window.showDirectoryPicker){ $('#btnRefresh').title='이 브라우저는 폴더 자동 새로고침을 지원하지 않습니다. 폴더를 다시 선택하세요.'; }
 applyLayout(defaultLayout());
