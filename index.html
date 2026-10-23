@@ -901,7 +901,7 @@ const SEP=String.fromCharCode(1);
 const ADJ_PRODUCT='(평가 조정)'; // 담당자별 공식 실적과 품목별 합계의 차액을 담는 가상 품목
 const PARSER_VERSION=7; // 파서 로직이 바뀌면 올린다 -> 이전 버전으로 읽어 둔 기록은 자동으로 다시 읽음
 /* ============================== 설정 ============================== */
-const TYPE_LABEL = {WAD:'WAD', EVAL:'평가실적', EXTRA:'원내·관계사', UNKNOWN:'미지정', SKIP:'제외'};
+const TYPE_LABEL = {WAD:'WAD', EVAL:'평가실적', EXTRA:'원내·관계사', WELL:'웰체크 마감', UNKNOWN:'미지정', SKIP:'제외'};
 const DIMS = ['office','rep','client','product'];
 const DIM_LABEL = {office:'사무소', rep:'담당자', client:'거래처', product:'품목', group:'품목군'};
 const KW = {
@@ -1311,6 +1311,36 @@ async function parseLite(file, ctx){
   return result;
 }
 /* 「▷26년09월_원내,매출,관계사 실적」: ★한장정리 시트의 ●최종 평가실적금액을 담당자·거래처·기준품명별로 읽는다 (원 → 천원) */
+/* 「○웰체크 9월 마감현황_261002(홍보)」: MR현황 시트의 담당자별 환자 수 × 1만원 = 평가 웰체크 실적(천원). 7·8월 평가와 담당자별로 정확히 일치 확인 */
+function wellMonthFromName(name){
+  const n=String(name||''); const m=n.match(/(\d{1,2})\s*월\s*마감/); if(!m) return null; const mo=+m[1]; if(mo<1||mo>12) return null;
+  const d=n.match(/(?:^|[^\d])(\d{2})(\d{2})(\d{2})(?!\d)/); let y=d?2000+(+d[1]):null; const closeMo=d?+d[2]:null;
+  if(y==null) return null; if(closeMo!=null && mo>closeMo) y-=1; // 12월 마감을 1월에 받은 경우
+  return `${y}-${String(mo).padStart(2,'0')}`;
+}
+async function parseWell(file, ctx){
+  const u8=new Uint8Array(await file.arrayBuffer());
+  const entries=zipEntries(u8); const sheets=await liteSheetList(u8,entries);
+  const sh=sheets.find(s=>/MR현황/.test(s.name)); if(!sh) return {error:'「MR현황」 시트를 찾지 못했습니다.'};
+  const ym=wellMonthFromName(file.name)||ctx.fileYM; if(!ym) return {error:'파일명에서 마감 월(예: 9월 마감현황_261002)을 찾지 못했습니다.'};
+  const sst=[];
+  if(entries.has('xl/sharedStrings.xml')){ const x=new TextDecoder().decode(await inflateEntry(u8,entries.get('xl/sharedStrings.xml'))); for(const m of x.matchAll(/<si>([\s\S]*?)<\/si>/g)){ sst.push(xmlUnesc((m[1].match(/<t[^>]*>[^<]*<\/t>/g)||[]).map(s=>s.replace(/<[^>]*>/g,'')).join(''))); } }
+  else if(entries.has('xl/sharedStrings.bin')){ const b=await inflateEntry(u8,entries.get('xl/sharedStrings.bin')); biffRecords(b,(t,p,len,dv,uu)=>{ if(t===0x0013) sst.push(biffStr(uu,dv,p+1)[0]); }); }
+  const e=entries.get(sh.path); const office=(ctx.office||'').trim();
+  let ix=null; const map=new Map(); let used=0, filteredOut=0;
+  const onRow=(r,a)=>{
+    if(!ix){ const t=a.map(v=>String(v??'').replace(/\s+/g,'')); if(t.includes('담당자') && t.includes('사무소') && t.includes('환자수')){ ix={off:t.indexOf('사무소'), rep:t.indexOf('담당자'), pat:t.indexOf('환자수')}; } return; }
+    const rep=String(a[ix.rep]??'').trim(); if(!rep) return; const off=String(a[ix.off]??'').trim();
+    if(office && off && !off.includes(office)){ filteredOut++; return; }
+    const n=toNum(a[ix.pat]); if(!n) return; map.set(off+SEP+rep,(map.get(off+SEP+rep)||0)+n*10); used++;
+  };
+  if(/\.bin$/i.test(sh.path)){ const coll=xlsbRows(sst,onRow); const bp=biffStreamParser(coll.record); await streamEntry(u8,e,c=>bp.push(c)); coll.end(); }
+  else { const dec=new TextDecoder(); const sc=xlsxRows(sst,onRow); await streamEntry(u8,e,c=>sc.push(dec.decode(c,{stream:true}))); sc.push(dec.decode()); sc.end(); }
+  if(!ix) return {error:'「MR현황」 시트에서 머리글(사무소·담당자·환자 수)을 찾지 못했습니다.'};
+  const rows=[]; for(const [k,v] of map){ const p=k.split(SEP); rows.push([p[0],p[1],'(웰체크)','웰체크',[v]]); }
+  return {months:[ym], rows, used, skipped:0, filteredOut, sheet:sh.name, hasDims:{office:true,rep:true,client:true,product:true}, headText:'웰체크 마감현황', groupNote:'', scale:1, mode:'single', fileYM:ym};
+}
+
 async function parseExtra(file, ctx){
   const u8=new Uint8Array(await file.arrayBuffer());
   const entries=zipEntries(u8); const sheets=await liteSheetList(u8,entries);
@@ -1364,6 +1394,7 @@ async function parseFile(file, relPath, ctx){
   try{
     let r=null;
     if(ctx.type==='EXTRA'){ r=await parseExtra(file,ctx); meta.engine='lite'; }
+    else if(ctx.type==='WELL'){ r=await parseWell(file,ctx); meta.engine='lite'; }
     else     if(/\.(xlsx|xlsm|xlsb)$/i.test(file.name) && typeof DecompressionStream!=='undefined'){
       try{ r=await parseLite(file,ctx); meta.engine='lite'; }catch(e){ console.warn('경량 파서 실패, 일반 파서로 재시도:', e); r=null; }
     }
@@ -1397,7 +1428,7 @@ function workerSource(){
   const consts=`const SEP=String.fromCharCode(1); const PARSER_VERSION=${PARSER_VERSION}; const DIMS=${JSON.stringify(DIMS)}; const EXCLUDE_HDR=${EXCLUDE_HDR.toString()};
 const KW={${Object.entries(KW).map(([k,v])=>k+':['+v.map(r=>r.toString()).join(',')+']').join(',')}};`;
   const fns=[`const norm=${norm.toString()};`, `const isCodeCol=${isCodeCol.toString()};`, `const gridText=${gridText.toString()};`, `const xmlUnesc=${xmlUnesc.toString()};`, `const u16dec=new TextDecoder('utf-16le');`,
-    matchDim, parseYM, monthFromText, toNum, headTextOf, detectScale, analyzeGrid, makeAccumulator, finishResult, parseWithSheetJS, zipEntries, inflateEntry, biffRecords, biffStr, rkToNum, colIndex, liteSheetList, streamEntry, biffStreamParser, xlsbRows, xlsxRows, applyRepOfficial, parseLite, parseExtra, detectType, readFileToWorkbook, parseFile].map(f=>typeof f==='string'?f:f.toString()).join('\n');
+    matchDim, parseYM, monthFromText, toNum, headTextOf, detectScale, analyzeGrid, makeAccumulator, finishResult, parseWithSheetJS, zipEntries, inflateEntry, biffRecords, biffStr, rkToNum, colIndex, liteSheetList, streamEntry, biffStreamParser, xlsbRows, xlsxRows, applyRepOfficial, parseLite, parseExtra, wellMonthFromName, parseWell, detectType, readFileToWorkbook, parseFile].map(f=>typeof f==='string'?f:f.toString()).join('\n');
   return `${lib}\n${consts}\n${fns}\nself.onmessage=async e=>{ const {jid,file,id,ctx}=e.data; let meta; try{ meta=await parseFile(file,id,ctx); }catch(err){ meta={id, name:file.name, path:id, size:file.size, lastModified:file.lastModified, type:'UNKNOWN', typeSource:'', warnings:[], error:'읽기 실패: '+(err&&err.message||err)}; } self.postMessage({jid, meta}); };`;
 }
 function getWorkers(){
@@ -1447,7 +1478,7 @@ function effectiveType(f){ return state.overrides[f.name] || f.type; }
 function mergeAll(){
   const out={}; const repMap=state.repMap||{}; const office=(state.office||'').trim();
   const excl=new Set((state.excludeReps||[]).map(s=>String(s).trim()).filter(Boolean));
-  for(const type of ['WAD','EVAL','EXTRA']){
+  for(const type of ['WAD','EVAL','EXTRA','WELL']){
     // 같은 달을 가진 파일이 여럿이면: 파일명 버전(v2 < v3)이 큰 쪽 → 그래도 같으면 수정일이 최신인 쪽
     const files=state.files.filter(f=>!f.error && effectiveType(f)===type).sort((a,b)=>(fileVersion(b.name)-fileVersion(a.name)) || (b.lastModified-a.lastModified));
     const owner={};
@@ -1493,7 +1524,8 @@ function nameType(name){
   const n=name.toLowerCase();
   if(kwList(state.patterns.EVAL).some(k=>n.includes(k))) return 'EVAL';
   if(kwList(state.patterns.WAD).some(k=>n.includes(k))) return 'WAD';
-  if(/원내.{0,3}매출|관계사\s*실적/.test(name)) return 'EXTRA'; // 「원내,매출,관계사 실적」 파일
+  if(/원내.{0,3}매출|관계사\s*실적/.test(name)) return 'EXTRA';
+  if(/웰체크.{0,6}마감/.test(name)) return 'WELL'; // 「○웰체크 9월 마감현황」 파일 // 「원내,매출,관계사 실적」 파일
   return null;
 }
 /* 파일명 버전: "_v3(공유)", "(공유)_v2" → 3, 2. 없으면 0 */
@@ -2063,7 +2095,7 @@ function renderFileList(){
     const row=document.createElement('div'); row.className='frow'+(et==='SKIP'||f.error?' excluded':'');
     const n=document.createElement('div'); n.className='n'; n.textContent=f.path; row.appendChild(n);
     const sel=document.createElement('select'); sel.className='sel';
-    for(const k of ['WAD','EVAL','EXTRA','SKIP']){ const o=document.createElement('option'); o.value=k; o.textContent=TYPE_LABEL[k]; sel.appendChild(o); }
+    for(const k of ['WAD','EVAL','EXTRA','WELL','SKIP']){ const o=document.createElement('option'); o.value=k; o.textContent=TYPE_LABEL[k]; sel.appendChild(o); }
     if(et==='UNKNOWN'){ const o=document.createElement('option'); o.value='UNKNOWN'; o.textContent='미지정 (선택하세요)'; sel.prepend(o); }
     sel.value=et; if(f.error) sel.disabled=true;
     sel.onchange=async()=>{ state.overrides[f.name]=sel.value; localStorage.setItem('tb.overrides',JSON.stringify(state.overrides)); await afterFilesChanged(); renderFileList(); };
@@ -2653,7 +2685,7 @@ const monthSpan=a=>a&&a.length?`${ymLabel(a[0])}~${ymLabel(a[a.length-1])} (${a.
 /* 게시 묶음: 집계에 필요한 것만 담는다 (값이 전부 0인 행은 제외) */
 function buildBundle(){
   const pack=t=>{ const d=state.data[t]; return {months:d.months.slice(), baseline:d.baseline||{}, rows:d.rows.filter(r=>r.v.some(x=>x)).map(r=>{ const a=[r.office,r.rep,r.client,r.product,Array.from(r.v,x=>Math.round(x*100)/100)]; if(r.old) a.push(r.old); return a; })}; };
-  return {fmt:'tb1', exportedAt:new Date().toISOString(), office:state.office||'', data:{WAD:pack('WAD'), EVAL:pack('EVAL'), EXTRA:state.data.EXTRA?pack('EXTRA'):{months:[],rows:[]}}, keyProducts:state.keyProducts||[], prodGroups:state.prodGroups||[], grades:state.grades, checks:state.checks||{text:''}};
+  return {fmt:'tb1', exportedAt:new Date().toISOString(), office:state.office||'', data:{WAD:pack('WAD'), EVAL:pack('EVAL'), EXTRA:state.data.EXTRA?pack('EXTRA'):{months:[],rows:[]}, WELL:state.data.WELL?pack('WELL'):{months:[],rows:[]}}, keyProducts:state.keyProducts||[], prodGroups:state.prodGroups||[], grades:state.grades, checks:state.checks||{text:''}};
 }
 function pubSalt(){ try{ const s=localStorage.getItem('tb.pubSalt'); if(s) return b64dec(s); }catch(e){} const u=crypto.getRandomValues(new Uint8Array(16)); try{ localStorage.setItem('tb.pubSalt', b64enc(u)); }catch(e){} return u; }
 async function encryptBundle(bundle, pw){
@@ -2678,7 +2710,7 @@ function applyBundle(b){
   if(Array.isArray(b.prodGroups)){ state.prodGroups=b.prodGroups; resetProductGroups(); }
   if(b.checks&&typeof b.checks.text==='string') state.checks=b.checks;
   if(b.grades&&b.grades.labels&&b.grades.Y) state.grades=Object.assign(JSON.parse(JSON.stringify(GRADE_DEFAULT)), b.grades);
-  state.data={WAD:conv('WAD'), EVAL:conv('EVAL'), EXTRA:conv('EXTRA')};
+  state.data={WAD:conv('WAD'), EVAL:conv('EVAL'), EXTRA:conv('EXTRA'), WELL:conv('WELL')};
   state.months=[...new Set([...state.data.WAD.months,...state.data.EVAL.months])].sort();
   state.bundleInfo={exportedAt:b.exportedAt};
   for(const d of DIMS) state.f[d]=null; state.quickActive=null;
@@ -2796,7 +2828,8 @@ function fcDecompose(){
     ev[m]=o; });
   // 원내·관계사 확정분: WAD 품목인데 그 거래처가 WAD에 이미 입력돼 있으면 ①에 들어가므로 빼고 담는다
   const ex={}; X.months.forEach((m,i)=>{ const w=wad[m]; const o={byRep:{}, total:0}; for(const r of X.rows){ const v=r.v[i]; if(!v) continue; const pg=pgOf(r.product); if(w && pg && w.key[fcName(r.client)+'|'+pg]) continue; o.byRep[r.rep]=(o.byRep[r.rep]||0)+v; o.total+=v; } ex[m]=o; });
-  return {wad, ev, ex, hasExtraType:exProds.size>0};
+  const WL=state.data.WELL||{months:[],rows:[]}; const well={}; WL.months.forEach((m,i)=>{ const o={}; for(const r of WL.rows){ const v=r.v[i]; if(v) o[r.rep]=(o[r.rep]||0)+v; } well[m]=o; });
+  return {wad, ev, ex, well, hasExtraType:exProds.size>0};
 }
 /* 대상월 T 예측. opt.oracle=true면 ②에 그 달 평가의 실제 금액을 넣는다(파일이 있었을 때의 정확도를 과거로 검증할 때) */
 function fcPredict(D, T, opt={}){
@@ -2814,11 +2847,11 @@ function fcPredict(D, T, opt={}){
     let s1=0, wadT=0; for(const [k,w] of Object.entries(keys)){ wadT+=w; const pg=k.slice(k.indexOf('|')+1);
       const ro=(pgW[pg]||0)>2000 ? (pgS[pg]||0)/pgW[pg] : rAll; const rr=((rS[pg]||0)+FC.Kr*ro)/((rW[pg]||0)+FC.Kr); const rc=((S[k]||0)+FC.Kc*rr)/((Wk[k]||0)+FC.Kc); s1+=w*rc; }
     const avg=f=>H.reduce((a,h)=>a+(D.ev[h][f][rep]||0),0)/H.length;
-    const s2x = known ? (known.byRep[rep]||0) : avg('s2x'); const s2=avg('s2'); const s3=D.ev[last].s3[rep]||0;
+    const s2x = known ? (known.byRep[rep]||0) : avg('s2x'); const s2=avg('s2'); let s3=D.ev[last].s3[rep]||0; const wellOK=!!(D.well&&D.well[T]&&D.well[last]); if(wellOK) s3+=(D.well[T][rep]||0)-(D.well[last][rep]||0); /* 웰체크: 직전월 가산에서 직전월 웰체크를 빼고 이번 달 확정 웰체크를 더한다 */
     if(!wadT && !s2 && !s2x && !s3) continue;
-    out[rep]={wad:wadT, s1, s2x, s2, s3, pred:s1+s2x+s2+s3, xKnown:!!known};
+    out[rep]={wad:wadT, s1, s2x, s2, s3, pred:s1+s2x+s2+s3, xKnown:!!known, wellT:(D.well&&D.well[T]?D.well[T][rep]||0:null)};
   }
-  return {T, H, last, reps:out, xKnown:!!known};
+  return {T, H, last, reps:out, xKnown:!!known, wellKnown:!!(D.well&&D.well[T]&&D.well[last])};
 }
 function fcBacktest(D, upTo){
   const months=Object.keys(D.ev).filter(m=>D.wad[m] && m<upTo).sort(); const rows=[];
@@ -2837,7 +2870,7 @@ function fcData(){
   const T=W.months[W.months.length-1];
   const P=fcPredict(D,T); if(!P) return {noHist:true, T};
   const BT=fcBacktest(D, T);
-  const hasActual=!!D.ev[T]; const xKnown=P.xKnown;
+  const hasActual=!!D.ev[T]; const xKnown=P.xKnown; const wellKnown=P.wellKnown;
   const band=xKnown?BT.bandX:BT.band, offBand=xKnown?BT.offBandX:BT.offBand;
   const baseAll=E.baseline||{}; const bm=Object.keys(baseAll).filter(m=>m<=T).sort(); const baseM=baseAll[T]?T:bm[bm.length-1]; const base=baseM?baseAll[baseM]:{};
   const q=qOf(T), y=T.slice(0,4); const evMonths=E.months.filter(m=>m<T && baseAll[m]);
@@ -2854,7 +2887,7 @@ function fcData(){
   const rows=repList.map(r=>mk(r,P.reps[r]));
   const tot=rows.reduce((o,r)=>{ for(const k of ['wad','s1','s2x','s2','s3','pred']) o[k]+=r[k]; return o; },{wad:0,s1:0,s2x:0,s2:0,s3:0,pred:0});
   const team=mk(null,tot);
-  return {T, H:P.H, last:P.last, baseM, hasActual, xKnown, hasExtraType:D.hasExtraType, rows, team, BT, q, y, qN:qList.length+1, yN:yList.length+1};
+  return {T, H:P.H, last:P.last, baseM, hasActual, xKnown, wellKnown, typRep:(xKnown?BT.repMAPE_X:BT.repMAPE)/100, typOff:(xKnown?BT.offMAPE_X:BT.offMAPE)/100, hasExtraType:D.hasExtraType, rows, team, BT, q, y, qN:qList.length+1, yN:yList.length+1};
 }
 function renderForecast(){
   const body=$('#fcBody'); body.innerHTML=''; const U=unitName(); const basis=$('#fcBasis');
@@ -2862,12 +2895,12 @@ function renderForecast(){
   if(!F){ basis.textContent=''; body.innerHTML='<div class="empty-note">WAD(처방실적트렌드)와 평가실적(로컬실적) 자료가 모두 있어야 예측할 수 있습니다.</div>'; return; }
   if(F.noHist){ basis.textContent=''; body.innerHTML=`<div class="empty-note">${esc(ymLong(F.T))} WAD는 있지만, 그 이전 달의 평가실적이 없어 환산율을 배울 수 없습니다.</div>`; return; }
   const repSel=state.f.rep; const rows=F.rows.filter(r=>!repSel||repSel.has(r.rep));
-  basis.innerHTML=`예측 대상 <b>${esc(ymLong(F.T))}</b> 평가실적 · WAD 입력실적 기준 · 원내·관계사 ${F.xKnown?'<b style="color:var(--up)">확정 파일 반영</b>':'파일 없음(평균으로 추정)'} · 학습 ${esc(ymLabel(F.H[0]))}~${esc(ymLabel(F.H[F.H.length-1]))} 평가 ${F.H.length}개월 · 기준점 ${esc(ymLabel(F.baseM||''))} · 단위 ${esc(U)}`
+  basis.innerHTML=`예측 대상 <b>${esc(ymLong(F.T))}</b> 평가실적 · WAD 입력실적 기준 · 원내·관계사 ${F.xKnown?'<b style="color:var(--up)">확정</b>':'평균 추정'} · 웰체크 ${F.wellKnown?'<b style="color:var(--up)">확정</b>':'직전월 값'} · 학습 ${esc(ymLabel(F.H[0]))}~${esc(ymLabel(F.H[F.H.length-1]))} 평가 ${F.H.length}개월 · 기준점 ${esc(ymLabel(F.baseM||''))} · 단위 ${esc(U)}`
     + (F.hasActual?' · <b style="color:var(--down)">이 달은 평가실적이 이미 나와 있어 실제값과 비교합니다</b>':'');
   const kp=document.createElement('div'); kp.className='kpis fc-kpis';
   const tile=(t,v,d)=>{ const el=document.createElement('div'); el.className='kpi'; el.innerHTML=`<div class="t"></div><div class="v"></div><div class="d"></div>`; el.children[0].textContent=t; el.children[1].innerHTML=v; el.children[2].innerHTML=d||''; kp.appendChild(el); };
   const T=F.team;
-  tile(`${ymLong(F.T)} 사무소 예측 평가실적`, `${fmtVal(T.pred)}<small>${esc(U)}</small>`, `예상 범위 ${fmtVal(T.lo)} ~ ${fmtVal(T.hi)}${F.hasActual?` · <b>실제 ${fmtVal(T.actual)}</b> (${fmtPct((T.pred-T.actual)/T.actual*100)})`:''}`);
+  tile(`${ymLong(F.T)} 사무소 예측 평가실적`, `${fmtVal(T.pred)}<small>${esc(U)}</small>`, `보통 범위(±${(F.typOff*100).toFixed(1)}%) <b>${fmtVal(T.pred*(1-F.typOff))} ~ ${fmtVal(T.pred*(1+F.typOff))}</b><br>80% 범위 ${fmtVal(T.lo)} ~ ${fmtVal(T.hi)}${F.hasActual?` · <b>실제 ${fmtVal(T.actual)}</b> (${fmtPct((T.pred-T.actual)/T.actual*100)})`:''}`);
   tile('WAD 입력실적', `${fmtVal(T.wad)}<small>${esc(U)}</small>`, `예측 ÷ 입력 = ${(T.pred/T.wad).toFixed(3)} · 입력 그대로면 ${fmtPct((T.wad-T.pred)/T.pred*100)} 차이`);
   tile(`${ymLong(F.T)} 예상 성장률·등급`, `${gradeHtml(T.grade,null)} <span style="font-size:20px">${fmtPct(T.rate)}</span>`, `기준점 ${fmtVal(T.base)} · 범위 ${fmtPct(T.rateLo)} ~ ${fmtPct(T.rateHi)}`);
   tile(`${F.q}Q 누적 예상 (${F.qN}개월)`, `${gradeHtml(T.quarter.grade,null)} <span style="font-size:20px">${fmtPct(T.quarter.rate)}</span>`, `확정 ${F.qN-1}개월 + ${ymLabel(F.T)} 예측`);
@@ -2878,11 +2911,11 @@ function renderForecast(){
   const H=[{label:'담당자',left:true,get:r=>r.rep},
     {label:'WAD 입력',get:r=>fmtVal(r.wad)},
     {label:'예측 평가실적',html:true,cls:'sum',get:r=>`<b>${fmtVal(r.pred)}</b>`},
-    {label:'예상 범위(80%)',get:r=>`${fmtVal(r.lo)} ~ ${fmtVal(r.hi)}`}];
+    {label:'보통 범위',html:true,get:r=>`${fmtVal(r.pred*(1-F.typRep))} ~ ${fmtVal(r.pred*(1+F.typRep))}<div class="small-muted" style="font-size:11px">80%: ${fmtVal(r.lo)}~${fmtVal(r.hi)}</div>`}];
   if(F.hasActual) H.push({label:'실제',html:true,get:r=>r.actual?`<b>${fmtVal(r.actual)}</b>`:'-'},{label:'오차',html:true,get:r=>r.actual?`<span class="${Math.abs(r.pred-r.actual)/r.actual<=0.05?'up':'down'}">${fmtPct((r.pred-r.actual)/r.actual*100)}</span>`:'-'});
   H.push({label:'① 입력 반영',get:r=>fmtVal(r.s1)},
     {label:F.xKnown?'② 원내·관계사(확정)':'② 원내·관계사(평균)',html:true,get:r=>F.xKnown?`<b>${fmtVal(r.s2x)}</b>`:fmtVal(r.s2x)},
-    {label:'③ 미입력·기타',get:r=>fmtVal(r.s2)},{label:'④ 가산(웰체크 등)',get:r=>fmtVal(r.s3)},
+    {label:'③ 미입력·기타',get:r=>fmtVal(r.s2)},{label:F.wellKnown?'④ 가산(웰체크 확정)':'④ 가산(웰체크 등)',html:true,get:r=>F.wellKnown?`<b>${fmtVal(r.s3)}</b>${r.wellT!=null?`<div class="small-muted" style="font-size:11px">웰체크 ${fmtVal(r.wellT)}</div>`:''}`:fmtVal(r.s3)},
     {label:'기준점',get:r=>fmtVal(r.base)},
     {label:'예상 성장률·등급',html:true,get:r=>`<span class="gcell">${gradeHtml(r.grade,r.rate)}</span>${r.gradeLo!==r.gradeHi?`<div class="small-muted" style="font-size:11px">${esc(r.gradeLo||'-')}~${esc(r.gradeHi||'-')}</div>`:''}`},
     {label:`${F.q}Q 누적`,html:true,get:r=>`<span class="gcell">${gradeHtml(r.quarter.grade,r.quarter.rate)}</span>`},
@@ -2890,7 +2923,7 @@ function renderForecast(){
     {label:'과거 오차',get:r=>r.btMape==null?'-':'±'+r.btMape.toFixed(1)+'%'});
   const t1=insTable(H,[...rows,F.team],{onClick:repClick});
   const lastTr=t1.querySelector('tbody tr:last-child'); if(lastTr){ lastTr.style.fontWeight='700'; lastTr.style.borderTop='3px double var(--border-strong)'; lastTr.classList.remove('click'); }
-  g1.appendChild(insCard(`담당자별 ${ymLong(F.T)} 평가실적 예측`, `예측 = ① WAD 입력 × 과거 환산율 + ② 원내·관계사(${F.xKnown?'그 달 확정 파일':'파일이 없어 6개월 평균'}) + ③ 미입력 거래처·WAD에 없는 품목 6개월 평균 + ④ 웰체크·직거래·성장금액 직전월 · 범위는 과거 검증 오차의 80% 구간`, t1, true));
+  g1.appendChild(insCard(`담당자별 ${ymLong(F.T)} 평가실적 예측`, `예측 = ① WAD 입력 × 과거 환산율 + ② 원내·관계사(${F.xKnown?'그 달 확정 파일':'파일이 없어 6개월 평균'}) + ③ 미입력 거래처·WAD에 없는 품목 6개월 평균 + ④ 웰체크·직거래·성장금액 직전월 · 보통 범위는 과거 평균 오차(±${(F.typRep*100).toFixed(1)}%), 80% 범위는 과거 10번 중 8번이 들어온 폭 · 웰체크는 ${F.wellKnown?'마감현황 확정값(환자 수 × 1만원)':'직전월 값'}`, t1, true));
   body.appendChild(g1);
   const B=F.BT; const g2=document.createElement('div'); g2.className='ins-grid';
   const sumBox=document.createElement('div'); sumBox.className='fc-acc'; const f1=v=>v==null?'-':v.toFixed(1);
