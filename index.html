@@ -1343,6 +1343,7 @@ async function parseFile(file, relPath, ctx){
     if(r.error){ meta.error=r.error; return meta; }
     Object.assign(meta, {months:r.months, rows:r.rows, used:r.used, skipped:r.skipped, sheet:r.sheet});
     const [t,src]= ctx.type ? [ctx.type,'파일명 규칙'] : detectType(file.name, r.headText); meta.type=t; meta.typeSource=src;
+    if(/당월입력처/.test(String(r.headText||'').replace(/\s+/g,''))){ meta.onlyLast=true; meta.warnings.push('당월 입력 거래처만 담은 보고서라 마지막 달만 반영합니다 (앞쪽 달은 일부 거래처만 들어 있음).'); }
     meta.version=ctx.version||0;
     if(r.groupNote) meta.warnings.push(r.groupNote);
     if(r.mode==='single') meta.warnings.push(`월 열이 없어 파일명·제목의 월(${r.fileYM})로 처리했습니다.`);
@@ -1422,7 +1423,9 @@ function mergeAll(){
     // 같은 달을 가진 파일이 여럿이면: 파일명 버전(v2 < v3)이 큰 쪽 → 그래도 같으면 수정일이 최신인 쪽
     const files=state.files.filter(f=>!f.error && effectiveType(f)===type).sort((a,b)=>(fileVersion(b.name)-fileVersion(a.name)) || (b.lastModified-a.lastModified));
     const owner={};
-    for(const f of files){ f.applied=[]; for(const m of f.months){ if(!(m in owner)){ owner[m]=f.id; f.applied.push(m);} } }
+    // 「처방성장률(당월입력처)」처럼 당월 입력 거래처만 담은 보고서는 앞쪽 달이 일부만 들어 있으므로 마지막 달만 반영한다
+    const onlyLast=f=>!!f.onlyLast||/당월입력처/.test(f.name||'');
+    for(const f of files){ f.applied=[]; const ms=onlyLast(f)?f.months.slice(-1):f.months; for(const m of ms){ if(!(m in owner)){ owner[m]=f.id; f.applied.push(m);} } }
     const months=Object.keys(owner).sort(); const mi={}; months.forEach((m,i)=>mi[m]=i);
     const map=new Map();
     for(const f of files){
