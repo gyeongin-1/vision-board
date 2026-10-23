@@ -268,6 +268,13 @@ main{padding:18px 24px 80px}
 .tabs button[data-tab="board"]::before{content:"📊"}
 .tabs button[data-tab="insight"]::before{content:"🔎"}
 .tabs button[data-tab="grades"]::before{content:"🏅"}
+.tabs button[data-tab="forecast"]::before{content:"🔮"}
+.fc-kpis{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.fc-acc-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}
+.fc-acc-row>div{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface)}
+.fc-acc-row .l{font-size:12px;color:var(--ink-2);font-weight:600}.fc-acc-row .v{font-size:24px;font-weight:800;margin:2px 0}.fc-acc-row .v.good{color:var(--up)}.fc-acc-row .d{font-size:12px;color:var(--muted)}
+.fc-how{font-size:13px;line-height:1.7;color:var(--ink-2);background:var(--surface);border:1px dashed var(--border-strong);border-radius:10px;padding:10px 14px;margin-top:4px}
+@media (max-width:700px){.fc-acc-row{grid-template-columns:1fr}}
 /* 카드: 흰 배경 + 그림자 + 뚜렷한 제목 띠 */
 .card,.tablecard,.kpi,.gcard,.rep-card{box-shadow:var(--shadow);border-color:var(--border-strong)}
 .card,.tablecard{padding:16px 18px 18px}
@@ -709,6 +716,7 @@ body:not(.viewer) .viewer-only{display:none!important}
       <button data-tab="board" class="on">현황</button>
       <button data-tab="insight">인사이트</button>
       <button data-tab="grades">평가 등급</button>
+      <button data-tab="forecast">평가 예측</button>
     </div>
 
     <div id="tab-board">
@@ -762,6 +770,10 @@ body:not(.viewer) .viewer-only{display:none!important}
     </section>
     </div>
 
+    <div id="tab-forecast" hidden>
+      <div class="ins-bar"><span id="fcBasis"></span><span class="spacer" style="flex:1"></span><span class="label" style="color:var(--muted)">WAD 입력실적이 먼저 나오면 이 달 평가실적을 미리 계산합니다</span></div>
+      <div id="fcBody"></div>
+    </div>
     <div id="tab-grades" hidden>
       <div class="ins-bar"><span id="gradeBasis"></span><span class="spacer" style="flex:1"></span><span class="label" style="color:var(--muted)">성장률 = (최종실적 − 기준점) ÷ 기준점 · 평가실적 「담당자별」 시트 기준</span></div>
       <div id="gradeBody"></div>
@@ -1645,9 +1657,10 @@ function renderAll(){
   $('#ms-office').hidden = optionsFor('office').length<=1 && !state.f.office;
   const agg=aggregate();
   $$('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===state.tab));
-  $('#tab-board').hidden = state.tab!=='board'; $('#tab-insight').hidden = state.tab!=='insight'; $('#tab-grades').hidden = state.tab!=='grades';
+  $('#tab-board').hidden = state.tab!=='board'; $('#tab-insight').hidden = state.tab!=='insight'; $('#tab-grades').hidden = state.tab!=='grades'; $('#tab-forecast').hidden = state.tab!=='forecast';
   if(state.tab==='insight'){ renderInsights(); return; }
   if(state.tab==='grades'){ renderGrades(); return; }
+  if(state.tab==='forecast'){ renderForecast(); return; }
   renderKpis(agg); renderTrend(agg); renderRanks(agg); renderTable(agg);
 }
 /* 주요 품목 퀵 버튼: 이름 일부(예: 펙수클루)로 "펙수클루군", "펙수클루정40mg" 등을 한꺼번에 고른다 */
@@ -2722,6 +2735,151 @@ $('#pubGo').onclick=async()=>{
   btn.disabled=false; btn.textContent='⬇ data.enc 만들기';
 };
 
+/* ============================== 평가실적 예측 (WAD 입력실적 → 평가실적) ============================== */
+/* 평가실적 = ① 입력 반영분 + ② 미입력·비WAD분 + ③ 담당자 가산분
+   ① WAD를 입력한 거래처의 WAD 품목: 과거 6개월의 「평가÷입력」 환산율을 거래처×품목군 → 담당자×품목군 → 사무소×품목군 순으로 보정해 적용
+   ② WAD를 입력하지 않은 거래처, WAD에 없는 품목(나보타·리브레·의료기기 등): 직전 6개월 평균
+   ③ 웰체크·직거래·성장금액 등 담당자 단위 가산(평가 조정 행): 직전월 값
+   과거 13개월 검증: 담당자별 평균 오차 4.3%(입력=평가 가정 7.6%), 사무소 합계 3.0%(6.8%) */
+const FC={hist:6, Kc:300, Kr:1000};
+const fcName=s=>String(s||'').replace(/\s+/g,'').replace(/-(폐업|휴업)$/,'').replace(/\((임|폐업|휴업)\)$/,'');
+function fcPgResolver(){
+  const groups=new Set(); for(const r of state.data.WAD.rows) if(r.product) groups.add(r.product);
+  const base=s=>String(s).replace(/군$/,'').replace(/\s/g,'');
+  const list=[...groups].map(p=>({p,b:base(p)})).filter(x=>x.b).sort((a,b)=>b.b.length-a.b.length);
+  const cache=new Map();
+  return prod=>{ if(cache.has(prod)) return cache.get(prod); const n=String(prod||'').replace(/\s/g,''); let g=null;
+    if(/^제미(메트|다파)/.test(n) && groups.has('제미글로군')) g='제미글로군'; else { const h=list.find(x=>n.startsWith(x.b)); g=h?h.p:null; }
+    cache.set(prod,g); return g; };
+}
+/* 월별 분해: WAD(담당자→거래처|품목군), ① s1(거래처|품목군), ② s2(담당자), ③ s3(담당자), 공식 합계(담당자) */
+function fcDecompose(){
+  const W=state.data.WAD, E=state.data.EVAL; const pgOf=fcPgResolver();
+  const wad={}; W.months.forEach((m,i)=>{ const o={byRep:{}, clients:new Set(), key:{}}; for(const r of W.rows){ const v=r.v[i]; if(!v) continue; const c=fcName(r.client); o.clients.add(c); const k=c+'|'+r.product; (o.byRep[r.rep]=o.byRep[r.rep]||{})[k]=((o.byRep[r.rep]||{})[k]||0)+v; o.key[k]=(o.key[k]||0)+v; } wad[m]=o; });
+  const ev={}; E.months.forEach((m,i)=>{ const w=wad[m]; const o={s1:{}, s2:{}, s3:{}, off:{}}; for(const r of E.rows){ const v=r.v[i]; if(!v) continue; o.off[r.rep]=(o.off[r.rep]||0)+v;
+      if(r.product===ADJ_PRODUCT){ o.s3[r.rep]=(o.s3[r.rep]||0)+v; continue; }
+      const c=fcName(r.client), pg=pgOf(r.product);
+      if(w && pg && w.clients.has(c)){ const k=c+'|'+pg; o.s1[k]=(o.s1[k]||0)+v; } else o.s2[r.rep]=(o.s2[r.rep]||0)+v; }
+    ev[m]=o; });
+  return {wad, ev};
+}
+/* 대상월 T의 담당자별 예측. hist: T 이전의 평가 월(최근 FC.hist개) */
+function fcPredict(D, T){
+  const wT=D.wad[T]; if(!wT) return null;
+  const evMonths=Object.keys(D.ev).filter(m=>m<T && D.wad[m]).sort(); const H=evMonths.slice(-FC.hist); if(!H.length) return null;
+  const last=H[H.length-1];
+  // 거래처|품목군 환산율 재료
+  const S={}, Wk={}; for(const h of H){ const e=D.ev[h].s1, w=D.wad[h].key; for(const [k,v] of Object.entries(w)) Wk[k]=(Wk[k]||0)+v; for(const [k,v] of Object.entries(e)) S[k]=(S[k]||0)+v; }
+  const pgS={}, pgW={}; let tS=0,tW=0; for(const [k,v] of Object.entries(Wk)){ const pg=k.slice(k.indexOf('|')+1); pgW[pg]=(pgW[pg]||0)+v; tW+=v; } for(const [k,v] of Object.entries(S)){ const pg=k.slice(k.indexOf('|')+1); pgS[pg]=(pgS[pg]||0)+v; tS+=v; }
+  const rAll=tW?tS/tW:1;
+  const out={}; const reps=new Set([...Object.keys(wT.byRep), ...H.flatMap(h=>Object.keys(D.ev[h].off))]);
+  for(const rep of reps){
+    const keys=wT.byRep[rep]||{};
+    const rS={}, rW={}; for(const k of Object.keys(keys)){ const pg=k.slice(k.indexOf('|')+1); rW[pg]=(rW[pg]||0)+(Wk[k]||0); rS[pg]=(rS[pg]||0)+(S[k]||0); }
+    let s1=0, wadT=0; for(const [k,w] of Object.entries(keys)){ wadT+=w; const pg=k.slice(k.indexOf('|')+1);
+      const ro=(pgW[pg]||0)>2000 ? (pgS[pg]||0)/pgW[pg] : rAll; const rr=((rS[pg]||0)+FC.Kr*ro)/((rW[pg]||0)+FC.Kr); const rc=((S[k]||0)+FC.Kc*rr)/((Wk[k]||0)+FC.Kc); s1+=w*rc; }
+    const s2=H.reduce((a,h)=>a+(D.ev[h].s2[rep]||0),0)/H.length; const s3=D.ev[last].s3[rep]||0;
+    if(!wadT && !s2 && !s3) continue;
+    out[rep]={wad:wadT, s1, s2, s3, pred:s1+s2+s3};
+  }
+  return {T, H, last, reps:out};
+}
+/* 과거 검증: 평가가 이미 나온 달마다 그 이전 자료만으로 예측해 실제와 비교 */
+function fcBacktest(D, upTo){
+  const months=Object.keys(D.ev).filter(m=>D.wad[m] && m<upTo).sort(); const rows=[];
+  for(const m of months){ const p=fcPredict(D,m); if(!p || p.H.length<3) continue; const act=D.ev[m].off; let pT=0,aT=0,wT=0;
+    for(const [rep,x] of Object.entries(p.reps)){ const a=act[rep]; if(!a) continue; rows.push({m, rep, pred:x.pred, act:a, wad:x.wad, err:(x.pred-a)/a, errW:x.wad?(x.wad-a)/a:null}); pT+=x.pred; aT+=a; wT+=x.wad; }
+    if(aT) rows.push({m, rep:'사무소 전체', pred:pT, act:aT, wad:wT, err:(pT-aT)/aT, errW:(wT-aT)/aT}); }
+  const reps=rows.filter(r=>r.rep!=='사무소 전체'), off=rows.filter(r=>r.rep==='사무소 전체');
+  const mape=a=>a.length?a.reduce((s,r)=>s+Math.abs(r.err),0)/a.length*100:null, mapeW=a=>{ const b=a.filter(r=>r.errW!=null); return b.length?b.reduce((s,r)=>s+Math.abs(r.errW),0)/b.length*100:null; };
+  const q=(a,p)=>{ const s=a.map(r=>Math.abs(r.err)).sort((x,y)=>x-y); return s.length?s[Math.min(s.length-1,Math.floor(s.length*p))]:0.08; };
+  return {rows, repMAPE:mape(reps), repMAPE_W:mapeW(reps), offMAPE:mape(off), offMAPE_W:mapeW(off), band:q(reps,0.8), offBand:q(off,0.8), n:reps.length, months:[...new Set(off.map(r=>r.m))]};
+}
+function fcData(){
+  const W=state.data&&state.data.WAD, E=state.data&&state.data.EVAL; if(!W||!E||!W.months.length||!E.months.length) return null;
+  const D=fcDecompose();
+  const T=W.months[W.months.length-1];
+  const P=fcPredict(D,T); if(!P) return {noHist:true, T};
+  const BT=fcBacktest(D, T);
+  const hasActual=!!D.ev[T];
+  // 기준점: 대상월 값이 있으면 그것, 없으면 가장 최근 달 값
+  const baseAll=E.baseline||{}; const bm=Object.keys(baseAll).filter(m=>m<=T).sort(); const baseM=baseAll[T]?T:bm[bm.length-1]; const base=baseM?baseAll[baseM]:{};
+  // 분기·연 누적: 대상월 이전 확정 실적 + 예측
+  const q=qOf(T), y=T.slice(0,4); const evMonths=E.months.filter(m=>m<T && baseAll[m]);
+  const qList=evMonths.filter(m=>m.slice(0,4)===y && qOf(m)===q), yList=evMonths.filter(m=>m.slice(0,4)===y);
+  const actOf=(m,rep)=>(D.ev[m]&&D.ev[m].off[rep])||0;
+  const repList=Object.keys(P.reps).filter(r=>base[r]!=null || P.reps[r].pred>1000).sort((a,b)=>a.localeCompare(b,'ko'));
+  const mk=(rep,x)=>{ const b=rep?(base[rep]||0):repList.reduce((s,r)=>s+(base[r]||0),0); const lo=x.pred*(1-(rep?BT.band:BT.offBand)), hi=x.pred*(1+(rep?BT.band:BT.offBand));
+    const g=(a)=>b>0?(a-b)/b*100:null; const cum=(list)=>{ let A=x.pred, B=b; for(const m of list){ A+=rep?actOf(m,rep):repList.reduce((s,r)=>s+actOf(m,r),0); B+=rep?((baseAll[m]||{})[rep]||0):repList.reduce((s,r)=>s+((baseAll[m]||{})[r]||0),0); } return {a:A,b:B,rate:B>0?(A-B)/B*100:null,n:list.length+1}; };
+    const qq=cum(qList), yy=cum(yList); const rate=g(x.pred);
+    const actual = hasActual ? (rep?actOf(T,rep):repList.reduce((s,r)=>s+actOf(T,r),0)) : null;
+    const bt=BT.rows.filter(r=>r.rep===(rep||'사무소 전체')); const btMape=bt.length?bt.reduce((s,r)=>s+Math.abs(r.err),0)/bt.length*100:null;
+    return {rep:rep||'사무소 전체', ...x, lo, hi, base:b, rate, rateLo:g(lo), rateHi:g(hi), grade:gradeOf(rate, state.grades.monthRule==='year'?'Y':'Q'+q), gradeLo:gradeOf(g(lo), state.grades.monthRule==='year'?'Y':'Q'+q), gradeHi:gradeOf(g(hi), state.grades.monthRule==='year'?'Y':'Q'+q), quarter:{...qq, grade:gradeOf(qq.rate,'Q'+q)}, year:{...yy, grade:gradeOf(yy.rate,'Y')}, actual, btMape};
+  };
+  const rows=repList.map(r=>mk(r,P.reps[r]));
+  const tot=rows.reduce((o,r)=>{ for(const k of ['wad','s1','s2','s3','pred']) o[k]+=r[k]; return o; },{wad:0,s1:0,s2:0,s3:0,pred:0});
+  const team=mk(null,tot);
+  return {T, H:P.H, last:P.last, baseM, hasActual, rows, team, BT, q, y, qN:qList.length+1, yN:yList.length+1};
+}
+function renderForecast(){
+  const body=$('#fcBody'); body.innerHTML=''; const U=unitName(); const basis=$('#fcBasis');
+  const F=fcData();
+  if(!F){ basis.textContent=''; body.innerHTML='<div class="empty-note">WAD(처방실적트렌드)와 평가실적(로컬실적) 자료가 모두 있어야 예측할 수 있습니다.</div>'; return; }
+  if(F.noHist){ basis.textContent=''; body.innerHTML=`<div class="empty-note">${esc(ymLong(F.T))} WAD는 있지만, 그 이전 달의 평가실적이 없어 환산율을 배울 수 없습니다.</div>`; return; }
+  const repSel=state.f.rep; const rows=F.rows.filter(r=>!repSel||repSel.has(r.rep));
+  const pctTxt=v=>v==null?'-':(v*100).toFixed(1)+'%';
+  basis.innerHTML=`예측 대상 <b>${esc(ymLong(F.T))}</b> 평가실적 · WAD 입력실적 기준 · 학습 ${esc(ymLabel(F.H[0]))}~${esc(ymLabel(F.H[F.H.length-1]))} 평가 ${F.H.length}개월 · 기준점 ${esc(ymLabel(F.baseM||''))} · 단위 ${esc(U)}`
+    + (F.hasActual?' · <b style="color:var(--down)">이 달은 평가실적이 이미 나와 있어 실제값과 비교합니다</b>':'');
+  // 1. 요약 카드
+  const kp=document.createElement('div'); kp.className='kpis fc-kpis';
+  const tile=(t,v,d)=>{ const el=document.createElement('div'); el.className='kpi'; el.innerHTML=`<div class="t"></div><div class="v"></div><div class="d"></div>`; el.children[0].textContent=t; el.children[1].innerHTML=v; el.children[2].innerHTML=d||''; kp.appendChild(el); };
+  const T=F.team;
+  tile(`${ymLong(F.T)} 사무소 예측 평가실적`, `${fmtVal(T.pred)}<small>${esc(U)}</small>`, `예상 범위 ${fmtVal(T.lo)} ~ ${fmtVal(T.hi)}${F.hasActual?` · <b>실제 ${fmtVal(T.actual)}</b> (${fmtPct((T.pred-T.actual)/T.actual*100)})`:''}`);
+  tile('WAD 입력실적', `${fmtVal(T.wad)}<small>${esc(U)}</small>`, `예측 ÷ 입력 = ${(T.pred/T.wad).toFixed(3)} · 입력 그대로면 ${fmtPct((T.wad-T.pred)/T.pred*100)} 차이`);
+  tile(`${ymLong(F.T)} 예상 성장률·등급`, `${gradeHtml(T.grade,null)} <span style="font-size:20px">${fmtPct(T.rate)}</span>`, `기준점 ${fmtVal(T.base)} · 범위 ${fmtPct(T.rateLo)} ~ ${fmtPct(T.rateHi)}`);
+  tile(`${F.q}Q 누적 예상 (${F.qN}개월)`, `${gradeHtml(T.quarter.grade,null)} <span style="font-size:20px">${fmtPct(T.quarter.rate)}</span>`, `확정 ${F.qN-1}개월 + ${ymLabel(F.T)} 예측`);
+  tile(`${F.y}년 누적 예상 (${F.yN}개월)`, `${gradeHtml(T.year.grade,null)} <span style="font-size:20px">${fmtPct(T.year.rate)}</span>`, `확정 ${F.yN-1}개월 + ${ymLabel(F.T)} 예측`);
+  body.appendChild(kp);
+  // 2. 담당자별 예측 표
+  const g1=document.createElement('div'); g1.className='ins-grid';
+  const repClick=r=>{ if(r.rep==='사무소 전체') return; const s=state.f.rep; if(s&&s.size===1&&s.has(r.rep)) state.f.rep=null; else state.f.rep=new Set([r.rep]); renderAll(); };
+  const H=[{label:'담당자',left:true,get:r=>r.rep},
+    {label:'WAD 입력',get:r=>fmtVal(r.wad)},
+    {label:'예측 평가실적',html:true,cls:'sum',get:r=>`<b>${fmtVal(r.pred)}</b>`},
+    {label:'예상 범위(80%)',get:r=>`${fmtVal(r.lo)} ~ ${fmtVal(r.hi)}`}];
+  if(F.hasActual) H.push({label:'실제',html:true,get:r=>r.actual?`<b>${fmtVal(r.actual)}</b>`:'-'},{label:'오차',html:true,get:r=>r.actual?`<span class="${Math.abs(r.pred-r.actual)/r.actual<=0.05?'up':'down'}">${fmtPct((r.pred-r.actual)/r.actual*100)}</span>`:'-'});
+  H.push({label:'① 입력 반영',get:r=>fmtVal(r.s1)},{label:'② 미입력·비WAD',get:r=>fmtVal(r.s2)},{label:'③ 가산(웰체크 등)',get:r=>fmtVal(r.s3)},
+    {label:'기준점',get:r=>fmtVal(r.base)},
+    {label:'예상 성장률·등급',html:true,get:r=>`<span class="gcell">${gradeHtml(r.grade,r.rate)}</span>${r.gradeLo!==r.gradeHi?`<div class="small-muted" style="font-size:11px">${esc(r.gradeLo||'-')}~${esc(r.gradeHi||'-')}</div>`:''}`},
+    {label:`${F.q}Q 누적`,html:true,get:r=>`<span class="gcell">${gradeHtml(r.quarter.grade,r.quarter.rate)}</span>`},
+    {label:`${F.y}년 누적`,html:true,get:r=>`<span class="gcell">${gradeHtml(r.year.grade,r.year.rate)}</span>`},
+    {label:'과거 오차',get:r=>r.btMape==null?'-':'±'+r.btMape.toFixed(1)+'%'});
+  const t1=insTable(H,[...rows,F.team],{onClick:repClick});
+  const lastTr=t1.querySelector('tbody tr:last-child'); if(lastTr){ lastTr.style.fontWeight='700'; lastTr.style.borderTop='3px double var(--border-strong)'; lastTr.classList.remove('click'); }
+  g1.appendChild(insCard(`담당자별 ${ymLong(F.T)} 평가실적 예측`, '예측 = ① WAD 입력 × 과거 환산율 + ② 미입력 거래처·비WAD 품목 6개월 평균 + ③ 웰체크·직거래·성장금액 등 직전월 값 · 범위는 과거 검증 오차의 80% 구간 · 등급은 범위 양 끝 기준도 함께 표시', t1, true));
+  body.appendChild(g1);
+  // 3. 과거 검증
+  const B=F.BT; const g2=document.createElement('div'); g2.className='ins-grid';
+  const sumBox=document.createElement('div'); sumBox.className='fc-acc';
+  sumBox.innerHTML=`<div class="fc-acc-row"><div><div class="l">담당자별 평균 오차</div><div class="v good">±${B.repMAPE==null?'-':B.repMAPE.toFixed(1)}%</div><div class="d">입력=평가로 봤을 때 ±${B.repMAPE_W==null?'-':B.repMAPE_W.toFixed(1)}%</div></div>
+    <div><div class="l">사무소 합계 평균 오차</div><div class="v good">±${B.offMAPE==null?'-':B.offMAPE.toFixed(1)}%</div><div class="d">입력=평가로 봤을 때 ±${B.offMAPE_W==null?'-':B.offMAPE_W.toFixed(1)}%</div></div>
+    <div><div class="l">검증 범위</div><div class="v">${B.months.length}개월</div><div class="d">${esc(B.months.map(ymLabel).join(', '))} · 담당자·월 ${B.n}건</div></div></div>`;
+  const offRows=B.rows.filter(r=>r.rep==='사무소 전체').reverse();
+  const tb=insTable([{label:'월',left:true,get:r=>ymLong(r.m)},{label:'WAD 입력',get:r=>fmtVal(r.wad)},{label:'예측',get:r=>fmtVal(r.pred)},{label:'실제 평가',html:true,get:r=>`<b>${fmtVal(r.act)}</b>`},{label:'예측 오차',html:true,get:r=>`<span class="${Math.abs(r.err)<=0.03?'up':'down'}">${fmtPct(r.err*100)}</span>`},{label:'입력=평가 오차',get:r=>fmtPct(r.errW*100)}], offRows);
+  const box=document.createElement('div'); box.append(sumBox,tb);
+  g2.appendChild(insCard('과거 검증: 같은 방법으로 지난달들을 예측했다면', '각 달은 그 달 이전 자료만 써서 예측한 값입니다 · 예측 오차가 클수록 원내·수금·의료기기처럼 WAD와 무관한 일회성 실적이 많았던 달', box));
+  // 담당자×월 오차 매트릭스
+  const reps=[...new Set(B.rows.filter(r=>r.rep!=='사무소 전체').map(r=>r.rep))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const mrows=reps.map(rep=>({rep, cells:B.months.map(m=>B.rows.find(r=>r.rep===rep&&r.m===m)||null)}));
+  const MH=[{label:'담당자',left:true,get:r=>r.rep}, ...B.months.map((m,i)=>({label:ymLabel(m),html:true,get:r=>{ const c=r.cells[i]; if(!c) return '-'; const e=c.err*100; return `<span class="${Math.abs(e)<=5?'up':Math.abs(e)<=10?'':'down'}" title="예측 ${fmtVal(c.pred)} / 실제 ${fmtVal(c.act)}">${fmtPct(e)}</span>`; }}))];
+  g2.appendChild(insCard('담당자별 과거 예측 오차', '±5% 이내 파랑 · ±10% 넘으면 빨강 · 칸에 마우스를 올리면 예측·실제 금액', insTable(MH,mrows)));
+  body.appendChild(g2);
+  // 4. 쓰는 법
+  const how=document.createElement('div'); how.className='fc-how';
+  how.innerHTML=`<b>매달 쓰는 법</b> · 새 달 처방실적트렌드(WAD)를 폴더에 넣고 새로고침하면 그 달이 자동으로 예측 대상이 됩니다. 평가실적이 나오면 실제값과 비교되고 다음 달 학습에 들어갑니다.<br>
+    <b>오차가 생기는 곳</b> · ②는 원내 대량 입고, 수금, 의료기기·나보타처럼 WAD에 잡히지 않는 실적이라 달마다 출렁입니다. 큰 건이 예정돼 있으면 그만큼 더해서 보세요. ③(웰체크·직거래)은 직전월 값을 그대로 씁니다.`;
+  body.appendChild(how);
+}
 /* ============================== 이벤트 ============================== */
 $('#btnFolder').onclick=pickFolder; $('#btnFolder2').onclick=pickFolder;
 $('#btnRefresh').onclick=refreshFromDir;
