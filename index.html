@@ -901,7 +901,7 @@ const SEP=String.fromCharCode(1);
 const ADJ_PRODUCT='(평가 조정)'; // 담당자별 공식 실적과 품목별 합계의 차액을 담는 가상 품목
 const PARSER_VERSION=7; // 파서 로직이 바뀌면 올린다 -> 이전 버전으로 읽어 둔 기록은 자동으로 다시 읽음
 /* ============================== 설정 ============================== */
-const TYPE_LABEL = {WAD:'WAD', EVAL:'평가실적', EXTRA:'원내·관계사', WELL:'웰체크 마감', UNKNOWN:'미지정', SKIP:'제외'};
+const TYPE_LABEL = {WAD:'WAD', EVAL:'평가실적', EXTRA:'원내·관계사', WELL:'웰체크 마감', CONF:'확정 평가(실매출·DCM)', UNKNOWN:'미지정', SKIP:'제외'};
 const DIMS = ['office','rep','client','product'];
 const DIM_LABEL = {office:'사무소', rep:'담당자', client:'거래처', product:'품목', group:'품목군'};
 const KW = {
@@ -1341,6 +1341,45 @@ async function parseWell(file, ctx){
   return {months:[ym], rows, used, skipped:0, filteredOut, sheet:sh.name, hasDims:{office:true,rep:true,client:true,product:true}, headText:'웰체크 마감현황', groupNote:'', scale:1, mode:'single', fileYM:ym};
 }
 
+/* 확정 평가 파일: 「●YY.MM월_DCM평가처(원내,원외)/실매출평가처 실적」·「●YY.MM월_실매출평가」·「●YY.MM월_처방/수기처 평가실적」(영업지원팀, 게시판 「로컬 - 평가실적」)
+   거래처×품목 평가대상액(간납가)을 읽는다. 이 거래처는 예측에서 WAD×환산율 대신 이 금액을 쓴다. 단위 원 → 천원 */
+async function parseConf(file, ctx){
+  const u8=new Uint8Array(await file.arrayBuffer());
+  const entries=zipEntries(u8); const sheets=await liteSheetList(u8,entries);
+  const ym=ctx.fileYM; if(!ym) return {error:'파일명에서 월(예: 26년05월)을 찾지 못했습니다.'};
+  const targets=sheets.filter(s=>/실매출|DCM평가처|DCM스토보|처방|수기|^\d{2}\.\d{2}월$/.test(s.name) && !/FAQ|거래처$|리스트|예외처|확인|기준|정보/.test(s.name)); // 실매출평가 파일은 시트명이 「26.05월」
+  if(!targets.length) return {error:'실매출평가·DCM평가처·처방/수기처 시트를 찾지 못했습니다.'};
+  const sst=[];
+  if(entries.has('xl/sharedStrings.xml')){ const x=new TextDecoder().decode(await inflateEntry(u8,entries.get('xl/sharedStrings.xml'))); for(const m of x.matchAll(/<si>([\s\S]*?)<\/si>/g)){ sst.push(xmlUnesc((m[1].match(/<t[^>]*>[^<]*<\/t>/g)||[]).map(s=>s.replace(/<[^>]*>/g,'')).join(''))); } }
+  else if(entries.has('xl/sharedStrings.bin')){ const b=await inflateEntry(u8,entries.get('xl/sharedStrings.bin')); biffRecords(b,(t,p,len,dv,uu)=>{ if(t===0x0013) sst.push(biffStr(uu,dv,p+1)[0]); }); }
+  const office=(ctx.office||'').trim(); const map=new Map(); let used=0, skipped=0, filteredOut=0; const usedSheets=[];
+  for(const sh of targets){
+    const e=entries.get(sh.path); if(!e) continue; let ix=null, cnt=0;
+    const onRow=(r,a)=>{
+      if(!ix){ const t=a.map(v=>String(v??'').replace(/\s+/g,''));
+        if(t.includes('담당자') && t.some(h=>/^(판매처명|실납처명|병원명|거래처명|거래처)$/.test(h))){
+          const fd=re=>t.findIndex(h=>re.test(h)); let fin=-1;
+          for(let i=t.length-1;i>=0;i--){ if(/간납가/.test(t[i]) && /평가(대상|실적)/.test(t[i])){ fin=i; break; } }
+          if(fin<0) fin=fd(/^평가(실적|대상)(금)?액/); if(fin<0) fin=fd(/인정금액|최종평가|평가실적/);
+          if(fin>=0) ix={off:fd(/^사무소/), rep:fd(/^담당자$/), cli:fd(/^(판매처명|실납처명|병원명|거래처명|거래처)$/), prod:fd(/^(기준품명|품목명|제품명|품목)$/), fin, excl:fd(/^평가제외/), note:fd(/^비고$/)};
+        } return; }
+      const rep=String(a[ix.rep]??'').trim(), cli=String(a[ix.cli]??'').trim(); if(!rep||!cli||/^(합계|총계|소계)$/.test(rep)){ skipped++; return; }
+      const off=ix.off>=0?String(a[ix.off]??'').trim():''; if(office && off && !off.includes(office)){ filteredOut++; return; }
+      if(ix.excl>=0 && String(a[ix.excl]??'').trim()){ skipped++; return; }
+      if(ix.note>=0 && /실적제외|평가제외/.test(String(a[ix.note]??''))){ skipped++; return; }
+      const v=toNum(a[ix.fin])/1000; if(!v){ skipped++; return; }
+      const prod=ix.prod>=0?String(a[ix.prod]??'').trim():'(확정 평가)';
+      const k=[off,rep,cli,prod||'(확정 평가)'].join(SEP); map.set(k,(map.get(k)||0)+v); used++; cnt++;
+    };
+    if(/\.bin$/i.test(sh.path)){ const coll=xlsbRows(sst,onRow); const bp=biffStreamParser(coll.record); await streamEntry(u8,e,c=>bp.push(c)); coll.end(); }
+    else { const dec=new TextDecoder(); const sc=xlsxRows(sst,onRow); await streamEntry(u8,e,c=>sc.push(dec.decode(c,{stream:true}))); sc.push(dec.decode()); sc.end(); }
+    if(ix) usedSheets.push(sh.name+'('+cnt+')');
+  }
+  if(!usedSheets.length) return {error:'시트에서 머리글(담당자·판매처명·평가대상액)을 찾지 못했습니다.'};
+  const rows=[]; for(const [k,v] of map){ const p=k.split(SEP); rows.push([p[0],p[1],p[2],p[3],[v]]); }
+  return {months:[ym], rows, used, skipped, filteredOut, sheet:usedSheets.join(', '), hasDims:{office:true,rep:true,client:true,product:true}, headText:'확정 평가(실매출·DCM)', groupNote:'', scale:0.001, mode:'single', fileYM:ym};
+}
+
 async function parseExtra(file, ctx){
   const u8=new Uint8Array(await file.arrayBuffer());
   const entries=zipEntries(u8); const sheets=await liteSheetList(u8,entries);
@@ -1393,7 +1432,8 @@ async function parseFile(file, relPath, ctx){
   const meta={id:relPath||file.name, name:file.name, path:relPath||file.name, size:file.size, lastModified:file.lastModified, type:'UNKNOWN', typeSource:'', warnings:[], pv:PARSER_VERSION, office:ctx.office||''};
   try{
     let r=null;
-    if(ctx.type==='EXTRA'){ r=await parseExtra(file,ctx); meta.engine='lite'; }
+    if(ctx.type==='CONF'){ r=await parseConf(file,ctx); meta.engine='lite'; }
+    else if(ctx.type==='EXTRA'){ r=await parseExtra(file,ctx); meta.engine='lite'; }
     else if(ctx.type==='WELL'){ r=await parseWell(file,ctx); meta.engine='lite'; }
     else     if(/\.(xlsx|xlsm|xlsb)$/i.test(file.name) && typeof DecompressionStream!=='undefined'){
       try{ r=await parseLite(file,ctx); meta.engine='lite'; }catch(e){ console.warn('경량 파서 실패, 일반 파서로 재시도:', e); r=null; }
@@ -1428,7 +1468,7 @@ function workerSource(){
   const consts=`const SEP=String.fromCharCode(1); const PARSER_VERSION=${PARSER_VERSION}; const DIMS=${JSON.stringify(DIMS)}; const EXCLUDE_HDR=${EXCLUDE_HDR.toString()};
 const KW={${Object.entries(KW).map(([k,v])=>k+':['+v.map(r=>r.toString()).join(',')+']').join(',')}};`;
   const fns=[`const norm=${norm.toString()};`, `const isCodeCol=${isCodeCol.toString()};`, `const gridText=${gridText.toString()};`, `const xmlUnesc=${xmlUnesc.toString()};`, `const u16dec=new TextDecoder('utf-16le');`,
-    matchDim, parseYM, monthFromText, toNum, headTextOf, detectScale, analyzeGrid, makeAccumulator, finishResult, parseWithSheetJS, zipEntries, inflateEntry, biffRecords, biffStr, rkToNum, colIndex, liteSheetList, streamEntry, biffStreamParser, xlsbRows, xlsxRows, applyRepOfficial, parseLite, parseExtra, wellMonthFromName, parseWell, detectType, readFileToWorkbook, parseFile].map(f=>typeof f==='string'?f:f.toString()).join('\n');
+    matchDim, parseYM, monthFromText, toNum, headTextOf, detectScale, analyzeGrid, makeAccumulator, finishResult, parseWithSheetJS, zipEntries, inflateEntry, biffRecords, biffStr, rkToNum, colIndex, liteSheetList, streamEntry, biffStreamParser, xlsbRows, xlsxRows, applyRepOfficial, parseLite, parseExtra, parseConf, wellMonthFromName, parseWell, detectType, readFileToWorkbook, parseFile].map(f=>typeof f==='string'?f:f.toString()).join('\n');
   return `${lib}\n${consts}\n${fns}\nself.onmessage=async e=>{ const {jid,file,id,ctx}=e.data; let meta; try{ meta=await parseFile(file,id,ctx); }catch(err){ meta={id, name:file.name, path:id, size:file.size, lastModified:file.lastModified, type:'UNKNOWN', typeSource:'', warnings:[], error:'읽기 실패: '+(err&&err.message||err)}; } self.postMessage({jid, meta}); };`;
 }
 function getWorkers(){
@@ -1478,7 +1518,7 @@ function effectiveType(f){ return state.overrides[f.name] || f.type; }
 function mergeAll(){
   const out={}; const repMap=state.repMap||{}; const office=(state.office||'').trim();
   const excl=new Set((state.excludeReps||[]).map(s=>String(s).trim()).filter(Boolean));
-  for(const type of ['WAD','EVAL','EXTRA','WELL']){
+  for(const type of ['WAD','EVAL','EXTRA','WELL','CONF']){
     // 같은 달을 가진 파일이 여럿이면: 파일명 버전(v2 < v3)이 큰 쪽 → 그래도 같으면 수정일이 최신인 쪽
     const files=state.files.filter(f=>!f.error && effectiveType(f)===type).sort((a,b)=>(fileVersion(b.name)-fileVersion(a.name)) || (b.lastModified-a.lastModified));
     const owner={};
@@ -1508,7 +1548,7 @@ function mergeAll(){
     if(type==='EVAL'){ for(const f of files){ if(!f.baseline || !f.applied || f.applied.length!==1) continue; const m=f.applied[0]; const b=baseline[m]||(baseline[m]={}); for(const [rep0,val] of Object.entries(f.baseline)){ const rep=repMap[rep0]||rep0; if(excl.has(rep0)||excl.has(rep)) continue; b[rep]=(b[rep]||0)+val; } } }
     out[type]={months, rows:[...map.values()], fileCount:files.length, baseline};
   }
-  for(const f of state.files){ if(f.error || !['WAD','EVAL'].includes(effectiveType(f))) f.applied=[]; }
+  for(const f of state.files){ if(f.error || !['WAD','EVAL','EXTRA','WELL','CONF'].includes(effectiveType(f))) f.applied=[]; }
   state.data=out;
   state.months=[...new Set([...out.WAD.months,...out.EVAL.months])].sort();
 }
@@ -1524,6 +1564,7 @@ function nameType(name){
   const n=name.toLowerCase();
   if(kwList(state.patterns.EVAL).some(k=>n.includes(k))) return 'EVAL';
   if(kwList(state.patterns.WAD).some(k=>n.includes(k))) return 'WAD';
+  if(/실매출평가|DCM\s*평가처|처방\/수기처|수기처.{0,4}평가|처방.{0,4}수기처/.test(name) && !/신청|양식|FAQ|기준점|평가유형/.test(name)) return 'CONF'; // 「●YY.MM월_DCM평가처(원내,원외)/실매출평가처 실적」 「●YY.MM월_처방/수기처 평가실적」
   if(/원내.{0,3}매출|관계사\s*실적/.test(name)) return 'EXTRA';
   if(/웰체크.{0,6}마감/.test(name)) return 'WELL'; // 「○웰체크 9월 마감현황」 파일 // 「원내,매출,관계사 실적」 파일
   return null;
@@ -2095,7 +2136,7 @@ function renderFileList(){
     const row=document.createElement('div'); row.className='frow'+(et==='SKIP'||f.error?' excluded':'');
     const n=document.createElement('div'); n.className='n'; n.textContent=f.path; row.appendChild(n);
     const sel=document.createElement('select'); sel.className='sel';
-    for(const k of ['WAD','EVAL','EXTRA','WELL','SKIP']){ const o=document.createElement('option'); o.value=k; o.textContent=TYPE_LABEL[k]; sel.appendChild(o); }
+    for(const k of ['WAD','EVAL','EXTRA','WELL','CONF','SKIP']){ const o=document.createElement('option'); o.value=k; o.textContent=TYPE_LABEL[k]; sel.appendChild(o); }
     if(et==='UNKNOWN'){ const o=document.createElement('option'); o.value='UNKNOWN'; o.textContent='미지정 (선택하세요)'; sel.prepend(o); }
     sel.value=et; if(f.error) sel.disabled=true;
     sel.onchange=async()=>{ state.overrides[f.name]=sel.value; localStorage.setItem('tb.overrides',JSON.stringify(state.overrides)); await afterFilesChanged(); renderFileList(); };
@@ -2685,7 +2726,7 @@ const monthSpan=a=>a&&a.length?`${ymLabel(a[0])}~${ymLabel(a[a.length-1])} (${a.
 /* 게시 묶음: 집계에 필요한 것만 담는다 (값이 전부 0인 행은 제외) */
 function buildBundle(){
   const pack=t=>{ const d=state.data[t]; return {months:d.months.slice(), baseline:d.baseline||{}, rows:d.rows.filter(r=>r.v.some(x=>x)).map(r=>{ const a=[r.office,r.rep,r.client,r.product,Array.from(r.v,x=>Math.round(x*100)/100)]; if(r.old) a.push(r.old); return a; })}; };
-  return {fmt:'tb1', exportedAt:new Date().toISOString(), office:state.office||'', data:{WAD:pack('WAD'), EVAL:pack('EVAL'), EXTRA:state.data.EXTRA?pack('EXTRA'):{months:[],rows:[]}, WELL:state.data.WELL?pack('WELL'):{months:[],rows:[]}}, keyProducts:state.keyProducts||[], prodGroups:state.prodGroups||[], grades:state.grades, checks:state.checks||{text:''}};
+  return {fmt:'tb1', exportedAt:new Date().toISOString(), office:state.office||'', data:{WAD:pack('WAD'), EVAL:pack('EVAL'), EXTRA:state.data.EXTRA?pack('EXTRA'):{months:[],rows:[]}, WELL:state.data.WELL?pack('WELL'):{months:[],rows:[]}, CONF:state.data.CONF?pack('CONF'):{months:[],rows:[]}}, keyProducts:state.keyProducts||[], prodGroups:state.prodGroups||[], grades:state.grades, checks:state.checks||{text:''}};
 }
 function pubSalt(){ try{ const s=localStorage.getItem('tb.pubSalt'); if(s) return b64dec(s); }catch(e){} const u=crypto.getRandomValues(new Uint8Array(16)); try{ localStorage.setItem('tb.pubSalt', b64enc(u)); }catch(e){} return u; }
 async function encryptBundle(bundle, pw){
@@ -2710,7 +2751,7 @@ function applyBundle(b){
   if(Array.isArray(b.prodGroups)){ state.prodGroups=b.prodGroups; resetProductGroups(); }
   if(b.checks&&typeof b.checks.text==='string') state.checks=b.checks;
   if(b.grades&&b.grades.labels&&b.grades.Y) state.grades=Object.assign(JSON.parse(JSON.stringify(GRADE_DEFAULT)), b.grades);
-  state.data={WAD:conv('WAD'), EVAL:conv('EVAL'), EXTRA:conv('EXTRA'), WELL:conv('WELL')};
+  state.data={WAD:conv('WAD'), EVAL:conv('EVAL'), EXTRA:conv('EXTRA'), WELL:conv('WELL'), CONF:conv('CONF')};
   state.months=[...new Set([...state.data.WAD.months,...state.data.EVAL.months])].sort();
   state.bundleInfo={exportedAt:b.exportedAt};
   for(const d of DIMS) state.f[d]=null; state.quickActive=null;
@@ -2817,24 +2858,31 @@ function fcPgResolver(){
     cache.set(prod,g); return g; };
 }
 function fcDecompose(){
-  const W=state.data.WAD, E=state.data.EVAL, X=state.data.EXTRA||{months:[],rows:[]}; const pgOf=fcPgResolver();
+  const W=state.data.WAD, E=state.data.EVAL, X=state.data.EXTRA||{months:[],rows:[]}, C=state.data.CONF||{months:[],rows:[]}; const pgOf=fcPgResolver();
   const exProds=new Set(); for(const r of X.rows) exProds.add(r.product);
   const wad={}; W.months.forEach((m,i)=>{ const o={byRep:{}, clients:new Set(), key:{}}; for(const r of W.rows){ const v=r.v[i]; if(!v) continue; const c=fcName(r.client); o.clients.add(c); const k=c+'|'+r.product; (o.byRep[r.rep]=o.byRep[r.rep]||{})[k]=((o.byRep[r.rep]||{})[k]||0)+v; o.key[k]=(o.key[k]||0)+v; } wad[m]=o; });
-  const ev={}; E.months.forEach((m,i)=>{ const w=wad[m]; const o={s1:{}, s2:{}, s2x:{}, s3:{}, off:{}}; for(const r of E.rows){ const v=r.v[i]; if(!v) continue; o.off[r.rep]=(o.off[r.rep]||0)+v;
+  const ev={}; E.months.forEach((m,i)=>{ const w=wad[m]; const o={s1:{}, s2:{}, s2c:{}, s2x:{}, s3:{}, off:{}}; for(const r of E.rows){ const v=r.v[i]; if(!v) continue; o.off[r.rep]=(o.off[r.rep]||0)+v;
       if(r.product===ADJ_PRODUCT){ o.s3[r.rep]=(o.s3[r.rep]||0)+v; continue; }
       const c=fcName(r.client), pg=pgOf(r.product);
       if(w && pg && w.clients.has(c)){ const k=c+'|'+pg; o.s1[k]=(o.s1[k]||0)+v; }
       else if(exProds.has(r.product)||FC_LUMP.test(r.product)) o.s2x[r.rep]=(o.s2x[r.rep]||0)+v;
-      else o.s2[r.rep]=(o.s2[r.rep]||0)+v; }
+      else { o.s2[r.rep]=(o.s2[r.rep]||0)+v; (o.s2c[r.rep]=o.s2c[r.rep]||{})[c]=((o.s2c[r.rep]||{})[c]||0)+v; } }
     ev[m]=o; });
   // 원내·관계사 확정분: WAD 품목인데 그 거래처가 WAD에 이미 입력돼 있으면 ①에 들어가므로 빼고 담는다
   const ex={}; X.months.forEach((m,i)=>{ const w=wad[m]; const o={byRep:{}, total:0}; for(const r of X.rows){ const v=r.v[i]; if(!v) continue; const pg=pgOf(r.product); if(w && pg && w.key[fcName(r.client)+'|'+pg]) continue; o.byRep[r.rep]=(o.byRep[r.rep]||0)+v; o.total+=v; } ex[m]=o; });
   const WL=state.data.WELL||{months:[],rows:[]}; const well={}; WL.months.forEach((m,i)=>{ const o={}; for(const r of WL.rows){ const v=r.v[i]; if(v) o[r.rep]=(o[r.rep]||0)+v; } well[m]=o; });
-  return {wad, ev, ex, well, hasExtraType:exProds.size>0};
+  // 확정 평가(실매출·DCM·처방/수기처): 담당자×거래처 금액
+  const conf={}; C.months.forEach((m,i)=>{ const o={byRep:{}, clients:new Set(), total:0}; for(const r of C.rows){ const v=r.v[i]; if(!v) continue; const c=fcName(r.client); const k=c+'|'+(pgOf(r.product)||'(기타)'); (o.byRep[r.rep]=o.byRep[r.rep]||{})[k]=((o.byRep[r.rep]||{})[k]||0)+v; o.clients.add(c); o.total+=v; } conf[m]=o; });
+  // 확정 금액 → 실제 평가실적 보정계수: 확정 파일과 평가실적이 둘 다 있는 달에서 (거래처×품목군) 실제 합 ÷ 확정 합. 없으면 1
+  const evCP={}; E.months.forEach((m,i)=>{ if(!conf[m]) return; const o={}; for(const r of E.rows){ const v=r.v[i]; if(!v||r.product===ADJ_PRODUCT) continue; const k=fcName(r.client)+'|'+(pgOf(r.product)||'(기타)'); o[k]=(o[k]||0)+v; } evCP[m]=o; });
+  let calS=0, calC=0; for(const m of Object.keys(conf)){ if(!evCP[m]) continue; for(const rep of Object.keys(conf[m].byRep)) for(const [k,v] of Object.entries(conf[m].byRep[rep])){ calC+=v; calS+=(evCP[m][k]||0); } }
+  const confCal = calC>0 ? Math.min(1.3, Math.max(0.8, calS/calC)) : 1;
+  return {wad, ev, ex, well, conf, confCal, hasExtraType:exProds.size>0};
 }
 /* 대상월 T 예측. opt.oracle=true면 ②에 그 달 평가의 실제 금액을 넣는다(파일이 있었을 때의 정확도를 과거로 검증할 때)
    opt.carry=true면 입력 진행 중으로 보고, T에 WAD가 없는 거래처는 직전 WAD 달의 값으로 채운다(거래처×품목군)
-   opt.manual={담당자:{거래처:이번 달 처방액}} 이면 그 거래처는 입력·보정값 대신 그 금액을 전월 품목군 비율로 나눠 넣는다 */
+   opt.manual={담당자:{거래처:금액}} 은 점검용(화면에서는 쓰지 않음)
+   T에 확정 평가(실매출·DCM·처방/수기처) 파일이 있으면 그 거래처×품목군은 WAD×환산율 대신 확정 금액(×보정계수)을 쓰고, WAD가 전혀 없는 확정 거래처는 ③ 평균에서 그 거래처 몫을 뺀다 */
 function fcInputOpen(T){ const [y,m]=String(T).split('-').map(Number); if(!y||!m) return false; return new Date() < new Date(y, m, 17); } // 처방입력 마감(다음 달 16일) 전이면 true
 function fcPredict(D, T, opt={}){
   const w0=D.wad[T]; if(!w0) return null;
@@ -2869,22 +2917,29 @@ function fcPredict(D, T, opt={}){
   const pgS={}, pgW={}; let tS=0,tW=0; for(const [k,v] of Object.entries(Wk)){ const pg=k.slice(k.indexOf('|')+1); pgW[pg]=(pgW[pg]||0)+v; tW+=v; } for(const [k,v] of Object.entries(S)){ const pg=k.slice(k.indexOf('|')+1); pgS[pg]=(pgS[pg]||0)+v; tS+=v; }
   const rAll=tW?tS/tW:1;
   const known = opt.oracle ? (D.ev[T]?{byRep:D.ev[T].s2x}:null) : (D.ex[T]||null);
-  const out={}; const reps=new Set([...Object.keys(wT.byRep), ...H.flatMap(h=>Object.keys(D.ev[h].off)), ...(known?Object.keys(known.byRep):[])]);
-  const Hs=H.slice(-FC.stable);
+  const cf = (!opt.oracle && D.conf && D.conf[T]) ? D.conf[T] : null; // 확정 평가(실매출·DCM·처방/수기처): byRep[rep]['거래처|품목군']
+  const cal = (D.confCal||1);
+  const out={}; const reps=new Set([...Object.keys(wT.byRep), ...H.flatMap(h=>Object.keys(D.ev[h].off)), ...(known?Object.keys(known.byRep):[]), ...(cf?Object.keys(cf.byRep):[])]);
+  const Hs=H.slice(-FC.stable); let confN=0;
   for(const rep of reps){
-    const keys=wT.byRep[rep]||{};
+    const keysAll=wT.byRep[rep]||{}; const cc=cf&&cf.byRep[rep];
+    let keys=keysAll, s1x=0, nConf=0; const confClientsNoWad=new Set();
+    if(cc){ keys={}; for(const [k,w] of Object.entries(keysAll)){ if(cc[k]!=null) continue; keys[k]=w; } // 확정된 거래처×품목군은 WAD×환산율에서 뺀다
+      const cls=new Set(); for(const [k,v] of Object.entries(cc)){ s1x+=v*cal; const c=k.slice(0,k.indexOf('|')); cls.add(c); if(!wT.clients.has(c)) confClientsNoWad.add(c); } nConf=cls.size; confN+=nConf; }
     const rS={}, rW={}; for(const k of Object.keys(keys)){ const pg=k.slice(k.indexOf('|')+1); rW[pg]=(rW[pg]||0)+(Wk[k]||0); rS[pg]=(rS[pg]||0)+(S[k]||0); }
-    let s1=0, wadT=0; for(const [k,w] of Object.entries(keys)){ wadT+=w; const pg=k.slice(k.indexOf('|')+1);
+    let s1=0; for(const [k,w] of Object.entries(keys)){ const pg=k.slice(k.indexOf('|')+1);
       const ro=(pgW[pg]||0)>2000 ? (pgS[pg]||0)/pgW[pg] : rAll; const rr=((rS[pg]||0)+FC.Kr*ro)/((rW[pg]||0)+FC.Kr); const rc=((S[k]||0)+FC.Kc*rr)/((Wk[k]||0)+FC.Kc); s1+=w*rc; }
+    const wadT=Object.values(keysAll).reduce((a,b)=>a+b,0);
     const wadIn=Object.values(w0.byRep[rep]||{}).reduce((a,b)=>a+b,0);
     const avg=(f,list)=>list.reduce((a,h)=>a+(D.ev[h][f][rep]||0),0)/list.length;
     const s2x = known ? (known.byRep[rep]||0) : avg('s2x',H); // ② 덩어리: 확정 파일 있으면 그 값, 없으면 6개월 평균(미확정)
-    const s2=avg('s2',Hs); // ③ 미입력 거래처·기타 소액: 최근 3개월 평균
+    // ③ 미입력 거래처·기타 소액: 최근 3개월 평균. WAD 없이 확정 평가만 있는 거래처는 과거 ③에 들어 있던 몫을 뺀다
+    const s2=Hs.reduce((a,h)=>{ let v=D.ev[h].s2[rep]||0; if(confClientsNoWad.size){ const sc=D.ev[h].s2c&&D.ev[h].s2c[rep]; if(sc) for(const c of confClientsNoWad) v-=sc[c]||0; } return a+Math.max(0,v); },0)/Hs.length;
     let s3=D.ev[last].s3[rep]||0; const wellOK=!!(D.well&&D.well[T]&&D.well[last]); if(wellOK) s3+=(D.well[T][rep]||0)-(D.well[last][rep]||0); /* ④ 웰체크: 직전월 가산에서 직전월 웰체크를 빼고 이번 달 확정 웰체크를 더한다 */
-    if(!wadT && !s2 && !s2x && !s3) continue;
-    out[rep]={wad:wadT, wadIn, carry:Math.max(0,carry.byRep[rep]||0), s1, s2x, s2, s3, pred:s1+s2x+s2+s3, xKnown:!!known, wellT:(D.well&&D.well[T]?D.well[T][rep]||0:null)};
+    if(!wadT && !s2 && !s2x && !s3 && !s1x) continue;
+    out[rep]={wad:wadT, wadIn, carry:Math.max(0,carry.byRep[rep]||0), s1, s1x, nConf, s2x, s2, s3, pred:s1+s1x+s2x+s2+s3, xKnown:!!known, wellT:(D.well&&D.well[T]?D.well[T][rep]||0:null)};
   }
-  return {T, H, R, last, reps:out, xKnown:!!known, wellKnown:!!(D.well&&D.well[T]&&D.well[last]), carry};
+  return {T, H, R, last, reps:out, xKnown:!!known, wellKnown:!!(D.well&&D.well[T]&&D.well[last]), confKnown:!!cf, confN, confCal:cal, carry};
 }
 
 function fcBacktest(D, upTo){
@@ -2921,54 +2976,17 @@ function fcData(){
     return {rep:rep||'사무소 전체', ...x, lo, hi, base:b, rate, rateLo:g(lo), rateHi:g(hi), grade:gradeOf(rate,col), gradeLo:gradeOf(g(lo),col), gradeHi:gradeOf(g(hi),col), quarter:{...qq, grade:gradeOf(qq.rate,'Q'+q)}, year:{...yy, grade:gradeOf(yy.rate,'Y')}, actual, btMape};
   };
   const rows=repList.map(r=>mk(r,P.reps[r]));
-  const tot=rows.reduce((o,r)=>{ for(const k of ['wad','wadIn','carry','s1','s2x','s2','s3','pred']) o[k]+=r[k]||0; return o; },{wad:0,wadIn:0,carry:0,s1:0,s2x:0,s2:0,s3:0,pred:0});
+  const tot=rows.reduce((o,r)=>{ for(const k of ['wad','wadIn','carry','s1','s1x','nConf','s2x','s2','s3','pred']) o[k]+=r[k]||0; return o; },{wad:0,wadIn:0,carry:0,s1:0,s1x:0,nConf:0,s2x:0,s2:0,s3:0,pred:0});
   const team=mk(null,tot);
-  return {T, D, H:P.H, R:P.R, last:P.last, carry:P.carry, carryOn:P.carry.on, baseM, hasActual, xKnown, wellKnown, typRep:(xKnown?BT.repMAPE_X:BT.repMAPE)/100, typOff:(xKnown?BT.offMAPE_X:BT.offMAPE)/100, hasExtraType:D.hasExtraType, rows, team, BT, q, y, qN:qList.length+1, yN:yList.length+1};
+  return {T, D, H:P.H, R:P.R, last:P.last, carry:P.carry, carryOn:P.carry.on, confKnown:P.confKnown, confN:P.confN, confCal:P.confCal, baseM, hasActual, xKnown, wellKnown, typRep:(xKnown?BT.repMAPE_X:BT.repMAPE)/100, typOff:(xKnown?BT.offMAPE_X:BT.offMAPE)/100, hasExtraType:D.hasExtraType, rows, team, BT, q, y, qN:qList.length+1, yN:yList.length+1};
 }
-/* ---- 내 예측 (담당자 직접 입력): 대형처의 이번 달 처방액을 넣으면 그 담당자의 예상 평가실적을 바로 계산한다. 입력은 이 브라우저(localStorage)에만 남는다 ---- */
-function fcManualKey(T){ return 'tb.fcManual.'+T; }
-function fcManualLoad(T){ try{ const o=JSON.parse(localStorage.getItem(fcManualKey(T))||'{}'); return (o&&typeof o==='object')?o:{}; }catch(e){ return {}; } }
-function fcManualSave(T,o){ try{ localStorage.setItem(fcManualKey(T), JSON.stringify(o)); }catch(e){} }
-function renderFcManual(F, body){
-  const D=F.D, T=F.T, U=unitName(); if(F.hasActual) return; // 평가실적이 이미 나온 달은 직접 입력이 의미 없다
-  const repNames=F.rows.map(r=>r.rep); if(!repNames.length) return;
-  let rep=state.fcManualRep; if(!rep||!repNames.includes(rep)) rep=(state.f.rep&&state.f.rep.size===1&&repNames.includes([...state.f.rep][0]))?[...state.f.rep][0]:repNames[0];
-  const manual=fcManualLoad(T); const mine=manual[rep]||{};
-  const P=F.carry.P; const prevKeys=(P&&D.wad[P]&&D.wad[P].byRep[rep])||{}; const curKeys=(D.wad[T].byRep[rep])||{};
-  const clients={}; for(const [k,v] of Object.entries(prevKeys)){ const c=k.slice(0,k.indexOf('|')); (clients[c]=clients[c]||{prev:0,cur:0}).prev+=v; } for(const [k,v] of Object.entries(curKeys)){ const c=k.slice(0,k.indexOf('|')); (clients[c]=clients[c]||{prev:0,cur:0}).cur+=v; }
-  for(const c of Object.keys(mine)) if(!clients[c]) clients[c]={prev:0,cur:0};
-  const list=Object.entries(clients).map(([c,o])=>({c,...o,man:(mine[c]!=null&&mine[c]!=='')?+mine[c]:null})).sort((a,b)=>Math.max(b.prev,b.cur)-Math.max(a.prev,a.cur));
-  const Pm=fcPredict(D,T,{carry:true, manual:{[rep]:mine}}); const x=Pm&&Pm.reps[rep]; if(!x) return;
-  const base=(F.rows.find(r=>r.rep===rep)||{}).base||0; const rate=base>0?(x.pred-base)/base*100:null; const col=state.grades.monthRule==='year'?'Y':'Q'+F.q;
-  const nMan=list.filter(r=>r.man!=null).length; const useVal=r=>r.man!=null?r.man:(r.cur||r.prev);
-  const card=document.createElement('div'); card.className='card wide'; const g=document.createElement('div'); g.className='ins-grid'; g.appendChild(card);
-  const sel=`<select id="fcMRep" class="btn small">${repNames.map(n=>`<option ${n===rep?'selected':''}>${esc(n)}</option>`).join('')}</select>`;
-  card.innerHTML=`<div class="dh" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">내 예측 — 대형처 이번 달 처방액 직접 입력</h2>${sel}<span class="small-muted">거래처 칸에 <b>${esc(ymLong(T))} 한 달 예상 처방액(${esc(U)})</b>을 넣으면 그 담당자의 예상 평가실적이 바로 바뀝니다. 비운 거래처는 ${esc(ymLabel(P||''))} 값(또는 이미 입력된 값)을 씁니다 · 이 브라우저에만 저장</span><span class="spacer" style="flex:1"></span><button class="btn small" id="fcMClear">입력 지우기</button></div>
-    <div class="kpis fc-kpis" id="fcMKpi"></div><div class="ins-scroll" id="fcMTbl" style="max-height:360px"></div>`;
-  const kp=card.querySelector('#fcMKpi'); const tile=(t,v,d)=>{ const el=document.createElement('div'); el.className='kpi'; el.innerHTML=`<div class="t"></div><div class="v"></div><div class="d"></div>`; el.children[0].textContent=t; el.children[1].innerHTML=v; el.children[2].innerHTML=d||''; kp.appendChild(el); };
-  tile(`${esc(rep)} ${ymLong(T)} 예상 평가실적`, `${fmtVal(x.pred)}<small>${esc(U)}</small>`, `보통 범위 ±${(F.typRep*100).toFixed(1)}% · ${fmtVal(x.pred*(1-F.typRep))} ~ ${fmtVal(x.pred*(1+F.typRep))}`);
-  tile('예상 성장률·등급', `${gradeHtml(gradeOf(rate,col),null)} <span style="font-size:20px">${fmtPct(rate)}</span>`, `기준점 ${fmtVal(base)}`);
-  tile('WAD (직접 입력 + 입력분 + 전월값)', `${fmtVal(x.wad)}<small>${esc(U)}</small>`, `직접 입력 ${nMan}처 · 파일 입력 ${fmtVal(x.wadIn)} · 전월값 보정 ${fmtVal(x.carry)}`);
-  tile('① 입력 반영 / ② 덩어리 / ③ 기타 / ④ 가산', `${fmtVal(x.s1)} / <span class="${x.xKnown?'':'down'}">${fmtVal(x.s2x)}</span> / ${fmtVal(x.s2)} / ${fmtVal(x.s3)}`, `② ${x.xKnown?'확정':'미확정(6개월 평균)'}`);
-  const tb=card.querySelector('#fcMTbl'); const t=document.createElement('table'); t.className='ins';
-  t.innerHTML=`<thead><tr><th class="l">거래처</th><th>${esc(ymLabel(P||'전월'))} WAD</th><th>${esc(ymLabel(T))} 파일 입력</th><th>이번 달 예상 처방액 (직접 입력)</th><th>적용값</th></tr></thead>`;
-  const tbody=document.createElement('tbody');
-  for(const r of list){ const tr=document.createElement('tr'); tr.innerHTML=`<td class="l">${esc(r.c)}</td><td>${fmtVal(r.prev)}</td><td>${r.cur?fmtVal(r.cur):'-'}</td><td><input type="number" step="1" data-c="${esc(r.c)}" value="${r.man!=null?r.man:''}" placeholder="${Math.round(r.cur||r.prev)}" style="width:110px;text-align:right;border:1px solid var(--border-2);border-radius:6px;padding:3px 6px;background:var(--page)"></td><td><b>${fmtVal(useVal(r))}</b>${r.man!=null?' <span class="up">입력</span>':''}</td>`; tbody.appendChild(tr); }
-  const sum=list.reduce((a,r)=>a+useVal(r),0); const trs=document.createElement('tr'); trs.style.fontWeight='700'; trs.innerHTML=`<td class="l">합계 (${list.length}처)</td><td>${fmtVal(list.reduce((a,r)=>a+r.prev,0))}</td><td>${fmtVal(list.reduce((a,r)=>a+r.cur,0))}</td><td>${nMan}처 입력</td><td>${fmtVal(sum)}</td>`; tbody.appendChild(trs);
-  t.appendChild(tbody); tb.appendChild(t);
-  card.querySelector('#fcMRep').onchange=e=>{ state.fcManualRep=e.target.value; renderForecast(); };
-  card.querySelector('#fcMClear').onclick=()=>{ if(!confirm(`${rep} ${ymLong(T)} 직접 입력을 모두 지울까요?`)) return; delete manual[rep]; fcManualSave(T,manual); renderForecast(); };
-  tb.querySelectorAll('input[data-c]').forEach(inp=>{ inp.onchange=()=>{ const c=inp.dataset.c; const m=fcManualLoad(T); m[rep]=m[rep]||{}; if(inp.value==='') delete m[rep][c]; else m[rep][c]=+inp.value; if(!Object.keys(m[rep]).length) delete m[rep]; fcManualSave(T,m); state.fcManualRep=rep; renderForecast(); }; });
-  body.appendChild(g);
-}
-
 function renderForecast(){
   const body=$('#fcBody'); body.innerHTML=''; const U=unitName(); const basis=$('#fcBasis');
   const F=fcData();
   if(!F){ basis.textContent=''; body.innerHTML='<div class="empty-note">WAD(처방실적트렌드)와 평가실적(로컬실적) 자료가 모두 있어야 예측할 수 있습니다.</div>'; return; }
   if(F.noHist){ basis.textContent=''; body.innerHTML=`<div class="empty-note">${esc(ymLong(F.T))} WAD는 있지만, 그 이전 달의 평가실적이 없어 환산율을 배울 수 없습니다.</div>`; return; }
   const repSel=state.f.rep; const rows=F.rows.filter(r=>!repSel||repSel.has(r.rep));
-  basis.innerHTML=`예측 대상 <b>${esc(ymLong(F.T))}</b> 평가실적 · ${F.carryOn?'<b>1차</b>(입력 중)':F.xKnown?'<b>최종</b>(원내·관계사 확정)':'<b>2차</b>(입력 마감)'} · 원내·관계사 ${F.xKnown?'<b style="color:var(--up)">확정</b>':'<b style="color:var(--down)">미확정</b>(6개월 평균)'} · 웰체크 ${F.wellKnown?'<b style="color:var(--up)">확정</b>':'직전월 값'} · 환산율 ${esc(ymLabel(F.R[0]))}~${esc(ymLabel(F.R[F.R.length-1]))} · 평균 ${esc(ymLabel(F.H[0]))}~${esc(ymLabel(F.H[F.H.length-1]))} · 기준점 ${esc(ymLabel(F.baseM||''))} · 단위 ${esc(U)}`
+  basis.innerHTML=`예측 대상 <b>${esc(ymLong(F.T))}</b> 평가실적 · ${F.carryOn?'<b>1차</b>(입력 중)':F.xKnown?'<b>최종</b>(원내·관계사 확정)':'<b>2차</b>(입력 마감)'} · 원내·관계사 ${F.xKnown?'<b style="color:var(--up)">확정</b>':'<b style="color:var(--down)">미확정</b>(6개월 평균)'} · 웰체크 ${F.wellKnown?'<b style="color:var(--up)">확정</b>':'직전월 값'} · 실매출·DCM ${F.confKnown?'<b style="color:var(--up)">확정 '+F.confN+'처</b>'+(F.confCal&&Math.abs(F.confCal-1)>0.005?' ×'+F.confCal.toFixed(2):''):'미반영'} · 환산율 ${esc(ymLabel(F.R[0]))}~${esc(ymLabel(F.R[F.R.length-1]))} · 평균 ${esc(ymLabel(F.H[0]))}~${esc(ymLabel(F.H[F.H.length-1]))} · 기준점 ${esc(ymLabel(F.baseM||''))} · 단위 ${esc(U)}`
     + (F.hasActual?' · <b style="color:var(--down)">이 달은 평가실적이 이미 나와 있어 실제값과 비교합니다</b>':'')
     + ` · <label style="cursor:pointer;white-space:nowrap"><input type="checkbox" id="fcCarry" ${F.carryOn?'checked':''}> 미입력 거래처 전월값 보정</label>`
     + (F.carryOn?` <span class="small-muted">(${F.carry.n}처 · ${fmtVal(F.carry.total)} ${esc(U)}, ${esc(ymLabel(F.carry.P||''))} 값)</span>`:'');
@@ -2989,7 +3007,7 @@ function renderForecast(){
     {label:'예측 평가실적',html:true,cls:'sum',get:r=>`<b>${fmtVal(r.pred)}</b>`},
     {label:'보통 범위',html:true,get:r=>`${fmtVal(r.pred*(1-F.typRep))} ~ ${fmtVal(r.pred*(1+F.typRep))}<div class="small-muted" style="font-size:11px">80%: ${fmtVal(r.lo)}~${fmtVal(r.hi)}</div>`}];
   if(F.hasActual) H.push({label:'실제',html:true,get:r=>r.actual?`<b>${fmtVal(r.actual)}</b>`:'-'},{label:'오차',html:true,get:r=>r.actual?`<span class="${Math.abs(r.pred-r.actual)/r.actual<=0.05?'up':'down'}">${fmtPct((r.pred-r.actual)/r.actual*100)}</span>`:'-'});
-  H.push({label:'① 입력 반영',get:r=>fmtVal(r.s1)},
+  H.push({label:F.confKnown?'① 입력 반영 + 확정 평가':'① 입력 반영',html:true,get:r=>F.confKnown?`${fmtVal(r.s1+(r.s1x||0))}<div class="small-muted" style="font-size:11px">확정 ${r.nConf||0}처 ${fmtVal(r.s1x||0)}</div>`:fmtVal(r.s1)},
     {label:F.xKnown?'② 원내·관계사(확정)':'② 원내·관계사(미확정)',html:true,get:r=>F.xKnown?`<b>${fmtVal(r.s2x)}</b>`:`<span class="down">${fmtVal(r.s2x)}</span>`},
     {label:'③ 미입력·기타',get:r=>fmtVal(r.s2)},{label:F.wellKnown?'④ 가산(웰체크 확정)':'④ 가산(웰체크 등)',html:true,get:r=>F.wellKnown?`<b>${fmtVal(r.s3)}</b>${r.wellT!=null?`<div class="small-muted" style="font-size:11px">웰체크 ${fmtVal(r.wellT)}</div>`:''}`:fmtVal(r.s3)},
     {label:'기준점',get:r=>fmtVal(r.base)},
@@ -3000,7 +3018,7 @@ function renderForecast(){
   const t1=insTable(H,[...rows,F.team],{onClick:repClick});
   const lastTr=t1.querySelector('tbody tr:last-child'); if(lastTr){ lastTr.style.fontWeight='700'; lastTr.style.borderTop='3px double var(--border-strong)'; lastTr.classList.remove('click'); }
   g1.appendChild(insCard(`담당자별 ${ymLong(F.T)} 평가실적 예측`, `예측 = ① WAD${F.carryOn?'(입력 + 미입력 거래처 전월값)':' 입력'} × 최근 ${FC.recent}개월 환산율(거래처×품목군) + ② 나보타·리브레 등 원내·관계사 덩어리(${F.xKnown?'그 달 확정 파일':'파일이 없어 6개월 평균 — 미확정'}) + ③ 미입력 거래처·기타 소액 최근 ${FC.stable}개월 평균 + ④ 웰체크·직거래·성장금액 가산 직전월 값 · 보통 범위는 과거 평균 오차(±${(F.typRep*100).toFixed(1)}%), 80% 범위는 과거 10번 중 8번이 들어온 폭 · 웰체크는 ${F.wellKnown?'마감현황 확정값(환자 수 × 1만원)':'직전월 값'}`, t1, true));
-  body.appendChild(g1); renderFcManual(F, body);
+  body.appendChild(g1);
   const B=F.BT; const g2=document.createElement('div'); g2.className='ins-grid';
   const sumBox=document.createElement('div'); sumBox.className='fc-acc'; const f1=v=>v==null?'-':v.toFixed(1);
   sumBox.innerHTML=`<div class="fc-acc-row"><div><div class="l">담당자별 평균 오차</div><div class="v good">±${f1(F.xKnown?B.repMAPE_X:B.repMAPE)}%</div><div class="d">${F.hasExtraType?`원내·관계사 파일 ${F.xKnown?'있을 때':'없을 때'} 기준 · ${F.xKnown?'없으면':'있으면'} ±${f1(F.xKnown?B.repMAPE:B.repMAPE_X)}% · `:''}입력=평가 ±${f1(B.repMAPE_W)}%</div></div>
@@ -3016,8 +3034,8 @@ function renderForecast(){
   g2.appendChild(insCard('담당자별 과거 예측 오차', '±5% 이내 파랑 · ±10% 넘으면 빨강 · 칸에 마우스를 올리면 예측·실제 금액', insTable(MH,mrows)));
   body.appendChild(g2);
   const how=document.createElement('div'); how.className='fc-how';
-  how.innerHTML=`<b>세 단계</b> · <b>1차(입력 중)</b> 담당자가 위 「내 예측」에 대형처 이번 달 처방액을 넣거나, 「처방실적트렌드2(당월입력처)」 파일을 넣을 때마다 입력분 + 미입력 거래처 전월값으로 봅니다 (9월 검증: 입력 43% 시점에도 사무소 합계 오차 0.1%, 담당자 평균 3~4%) → <b>2차(입력 마감)</b> 다음 달 16일 처방입력이 끝난 전체 WAD로 다시 계산합니다(보정 자동 꺼짐, 체크로 다시 켤 수 있음) → <b>최종</b> 다음 달 3~4주차 영업지원팀 메일 「●M월 실적_회전지연처 원내&amp;매출&amp;관계사」(게시판 「로컬 - 평가실적」)의 파일과 웰체크 마감현황을 넣으면 ②④가 확정값으로 바뀝니다 → 로컬실적 파일이 오면 실제값과 비교하고 학습에 들어갑니다.<br>
-    <b>남은 오차가 생기는 곳</b> · ② 나보타·리브레·위스키 같은 덩어리는 달마다 0~40백만원씩 출렁여 파일 전에는 맞힐 수 없습니다(5·6월 −7~−8%의 원인). ① 환산율은 올해 0.97 → 0.91로 계속 내려와 최근 ${FC.recent}개월만 씁니다. ④ 웰체크는 매달 늘고 있어 직전월 값보다 실제가 클 수 있습니다. 실매출평가·DCM 평가처 확정분은 아직 따로 받지 않습니다.`;
+  how.innerHTML=`<b>세 단계</b> · <b>1차(입력 중)</b> 「처방실적트렌드2(당월입력처)」 파일을 받을 때마다 폴더에 넣으면 그날까지 입력분 + 미입력 거래처 전월값으로 봅니다 (9월 검증: 입력 43% 시점에도 사무소 합계 오차 0.1%, 담당자 평균 3~4%) → <b>2차(입력 마감)</b> 다음 달 16일 처방입력이 끝난 전체 WAD로 다시 계산합니다(보정 자동 꺼짐, 체크로 다시 켤 수 있음) → <b>최종</b> 다음 달 3~4주차 영업지원팀 메일 「●M월 실적_회전지연처 원내&amp;매출&amp;관계사」(게시판 「로컬 - 평가실적」)의 파일, 「●M월_DCM평가처(원내 원외)/실매출평가처 실적」(28일경)과 「●M월_처방/수기처 평가실적」(29일경) 파일, 웰체크 마감현황을 넣으면 ①②④가 확정값으로 바뀝니다(확정 평가 거래처는 WAD×환산율 대신 확정 금액) → 로컬실적 파일이 오면 실제값과 비교하고 학습에 들어갑니다.<br>
+    <b>남은 오차가 생기는 곳</b> · ② 나보타·리브레·위스키 같은 덩어리는 달마다 0~40백만원씩 출렁여 파일 전에는 맞힐 수 없습니다(5·6월 −7~−8%의 원인). ① 환산율은 올해 0.97 → 0.91로 계속 내려와 최근 ${FC.recent}개월만 씁니다. ④ 웰체크는 매달 늘고 있어 직전월 값보다 실제가 클 수 있습니다.`;
   body.appendChild(how);
 }
 /* ============================== 이벤트 ============================== */
