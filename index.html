@@ -900,7 +900,7 @@ const VIEWER = /^https?:$/.test(location.protocol) && !/[?&]admin(=|&|$)/.test(l
 if(VIEWER) document.body.classList.add('viewer');
 const SEP=String.fromCharCode(1);
 const ADJ_PRODUCT='(평가 조정)'; // 담당자별 공식 실적과 품목별 합계의 차액을 담는 가상 품목
-const PARSER_VERSION=7; // 파서 로직이 바뀌면 올린다 -> 이전 버전으로 읽어 둔 기록은 자동으로 다시 읽음
+const PARSER_VERSION=8; // 파서 로직이 바뀌면 올린다 -> 이전 버전으로 읽어 둔 기록은 자동으로 다시 읽음
 /* ============================== 설정 ============================== */
 const TYPE_LABEL = {WAD:'WAD', EVAL:'평가실적', EXTRA:'원내·관계사', WELL:'웰체크 마감', CONF:'확정 평가(실매출·DCM)', UNKNOWN:'미지정', SKIP:'제외'};
 const DIMS = ['office','rep','client','product'];
@@ -1314,8 +1314,8 @@ async function parseLite(file, ctx){
 /* 「▷26년09월_원내,매출,관계사 실적」: ★한장정리 시트의 ●최종 평가실적금액을 담당자·거래처·기준품명별로 읽는다 (원 → 천원) */
 /* 「○웰체크 9월 마감현황_261002(홍보)」: MR현황 시트의 담당자별 환자 수 × 1만원 = 평가 웰체크 실적(천원). 7·8월 평가와 담당자별로 정확히 일치 확인 */
 function wellMonthFromName(name){
-  const n=String(name||''); const m=n.match(/(\d{1,2})\s*월\s*마감/); if(!m) return null; const mo=+m[1]; if(mo<1||mo>12) return null;
-  const d=n.match(/(?:^|[^\d])(\d{2})(\d{2})(\d{2})(?!\d)/); let y=d?2000+(+d[1]):null; const closeMo=d?+d[2]:null;
+  const n=String(name||''); const m=n.match(/(\d{1,2})\s*월\s*(?:마감|청구금액\s*평가)/); if(!m) return null; const mo=+m[1]; if(mo<1||mo>12) return null; // 「9월 마감현황_261002」 「10월 청구금액 평가(11월1주차 중간집계)_20261108」
+  const d=n.match(/(?:^|[^\d])(?:20)?(\d{2})(\d{2})(\d{2})(?!\d)/); let y=d?2000+(+d[1]):null; const closeMo=d?+d[2]:null;
   if(y==null) return null; if(closeMo!=null && mo>closeMo) y-=1; // 12월 마감을 1월에 받은 경우
   return `${y}-${String(mo).padStart(2,'0')}`;
 }
@@ -1330,10 +1330,12 @@ async function parseWell(file, ctx){
   const e=entries.get(sh.path); const office=(ctx.office||'').trim();
   let ix=null; const map=new Map(); let used=0, filteredOut=0;
   const onRow=(r,a)=>{
-    if(!ix){ const t=a.map(v=>String(v??'').replace(/\s+/g,'')); if(t.includes('담당자') && t.includes('사무소') && t.includes('환자수')){ ix={off:t.indexOf('사무소'), rep:t.indexOf('담당자'), pat:t.indexOf('환자수')}; } return; }
+    if(!ix){ const t=a.map(v=>String(v??'').replace(/\s+/g,'')); if(t.includes('담당자') && t.includes('사무소') && t.includes('환자수')){ ix={off:t.indexOf('사무소'), rep:t.indexOf('담당자'), pat:t.indexOf('환자수'), fin:-1, sub:false}; } return; }
+    // 2026-10월부터 평가 = 일만사 청구금액 + 비일만사 환자수×1만원 (C평가자 50%) — 파일의 「최종평가」 열(천원)을 그대로 쓴다. 그 열이 없는 달(9월까지)은 환자수×1만원
+    if(!ix.sub){ ix.sub=true; const t=a.map(v=>String(v??'').replace(/\s+/g,'')); const fi=t.findIndex(x=>/^최종평가/.test(x)); if(fi>=0){ ix.fin=fi; return; } }
     const rep=String(a[ix.rep]??'').trim(); if(!rep) return; const off=String(a[ix.off]??'').trim();
     if(office && off && !off.includes(office)){ filteredOut++; return; }
-    const n=toNum(a[ix.pat]); if(!n) return; map.set(off+SEP+rep,(map.get(off+SEP+rep)||0)+n*10); used++;
+    const n=ix.fin>=0 ? toNum(a[ix.fin]) : toNum(a[ix.pat])*10; if(!n) return; map.set(off+SEP+rep,(map.get(off+SEP+rep)||0)+n); used++;
   };
   if(/\.bin$/i.test(sh.path)){ const coll=xlsbRows(sst,onRow); const bp=biffStreamParser(coll.record); await streamEntry(u8,e,c=>bp.push(c)); coll.end(); }
   else { const dec=new TextDecoder(); const sc=xlsxRows(sst,onRow); await streamEntry(u8,e,c=>sc.push(dec.decode(c,{stream:true}))); sc.push(dec.decode()); sc.end(); }
@@ -1569,7 +1571,7 @@ function nameType(name){
   if(kwList(state.patterns.WAD).some(k=>n.includes(k))) return 'WAD';
   if(/실매출평가|DCM\s*평가처|처방\/수기처|수기처.{0,4}평가|처방.{0,4}수기처|\d{2}월_처방실적\.xls/.test(name) && !/신청|양식|FAQ|기준점|평가유형/.test(name)) return 'CONF'; // 「▷YY년MM월_처방실적.xlsb」= 처방/수기처 확정 평가 // 「●YY.MM월_DCM평가처(원내,원외)/실매출평가처 실적」 「●YY.MM월_처방/수기처 평가실적」
   if(/원내.{0,3}매출|관계사\s*실적/.test(name)) return 'EXTRA';
-  if(/웰체크.{0,6}마감/.test(name)) return 'WELL'; // 「○웰체크 9월 마감현황」 파일 // 「원내,매출,관계사 실적」 파일
+  if(/웰체크.{0,6}마감|웰체크.{0,8}청구금액\s*평가/.test(name)) return 'WELL'; // 「○웰체크 9월 마감현황」 파일 // 「원내,매출,관계사 실적」 파일
   return null;
 }
 /* 파일명 버전: "_v3(공유)", "(공유)_v2" → 3, 2. 없으면 0 */
