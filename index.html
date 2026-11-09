@@ -1564,7 +1564,7 @@ function nameType(name){
   const n=name.toLowerCase();
   if(kwList(state.patterns.EVAL).some(k=>n.includes(k))) return 'EVAL';
   if(kwList(state.patterns.WAD).some(k=>n.includes(k))) return 'WAD';
-  if(/실매출평가|DCM\s*평가처|처방\/수기처|수기처.{0,4}평가|처방.{0,4}수기처/.test(name) && !/신청|양식|FAQ|기준점|평가유형/.test(name)) return 'CONF'; // 「●YY.MM월_DCM평가처(원내,원외)/실매출평가처 실적」 「●YY.MM월_처방/수기처 평가실적」
+  if(/실매출평가|DCM\s*평가처|처방\/수기처|수기처.{0,4}평가|처방.{0,4}수기처|\d{2}월_처방실적\.xls/.test(name) && !/신청|양식|FAQ|기준점|평가유형/.test(name)) return 'CONF'; // 「▷YY년MM월_처방실적.xlsb」= 처방/수기처 확정 평가 // 「●YY.MM월_DCM평가처(원내,원외)/실매출평가처 실적」 「●YY.MM월_처방/수기처 평가실적」
   if(/원내.{0,3}매출|관계사\s*실적/.test(name)) return 'EXTRA';
   if(/웰체크.{0,6}마감/.test(name)) return 'WELL'; // 「○웰체크 9월 마감현황」 파일 // 「원내,매출,관계사 실적」 파일
   return null;
