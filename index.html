@@ -2845,7 +2845,7 @@ $('#pubGo').onclick=async()=>{
    ① WAD를 입력한 거래처의 WAD 품목: 과거 6개월 「평가÷입력」 환산율을 거래처×품목군 → 담당자×품목군 → 사무소×품목군 순으로 보정해 적용
    ② 「원내,매출,관계사 실적」 파일이 있으면 그 달 확정 금액, 없으면 직전 6개월 평균
    ③ 직전 6개월 평균   ④ 웰체크·직거래·성장금액 등(평가 조정 행): 직전월 값 */
-const FC={hist:6, recent:2, stable:3, Kc:300, Kr:1000}; // hist: 평균 학습 개월, recent: 환산율 학습 개월(최근), stable: 미입력·기타 평균 개월
+const FC={hist:6, recent:2, stable:3, Kc:300, Kr:1000}; // hist: 평균 학습 개월, recent: 환산율 학습 개월(최근), stable: 미입력·기타 중앙값 개월
 const FC_LUMP=/나보타|리브레|WISKY|위스키|옵티나|리포타손|CGBIO|이지듀|시너지아/i; // 원내·관계사·DH 덩어리 품목 — 파일이 없을 때 ②로 분류
 const fcName=s=>String(s||'').replace(/\s+/g,'').replace(/-(폐업|휴업)$/,'').replace(/\((임|폐업|휴업)\)$/,'');
 function fcPgResolver(){
@@ -2933,8 +2933,8 @@ function fcPredict(D, T, opt={}){
     const wadIn=Object.values(w0.byRep[rep]||{}).reduce((a,b)=>a+b,0);
     const avg=(f,list)=>list.reduce((a,h)=>a+(D.ev[h][f][rep]||0),0)/list.length;
     const s2x = known ? (known.byRep[rep]||0) : avg('s2x',H); // ② 덩어리: 확정 파일 있으면 그 값, 없으면 6개월 평균(미확정)
-    // ③ 미입력 거래처·기타 소액: 최근 3개월 평균. WAD 없이 확정 평가만 있는 거래처는 과거 ③에 들어 있던 몫을 뺀다
-    const s2=Hs.reduce((a,h)=>{ let v=D.ev[h].s2[rep]||0; if(confClientsNoWad.size){ const sc=D.ev[h].s2c&&D.ev[h].s2c[rep]; if(sc) for(const c of confClientsNoWad) v-=sc[c]||0; } return a+Math.max(0,v); },0)/Hs.length;
+    // ③ 미입력 거래처·기타 소액: 최근 3개월 중앙값. WAD 없이 확정 평가만 있는 거래처는 과거 ③에 들어 있던 몫을 뺀다
+    const s2Hist=Hs.map(h=>{ let v=D.ev[h].s2[rep]||0; if(confClientsNoWad.size){ const sc=D.ev[h].s2c&&D.ev[h].s2c[rep]; if(sc) for(const c of confClientsNoWad) v-=sc[c]||0; } return Math.max(0,v); }).sort((a,b)=>a-b); const s2=s2Hist.length?(s2Hist.length%2?s2Hist[(s2Hist.length-1)/2]:(s2Hist[s2Hist.length/2-1]+s2Hist[s2Hist.length/2])/2):0; // 중앙값: 평균은 튀는 달에 끌려 매달 +9~12 과대였다 (26.11 검증)
     let s3=D.ev[last].s3[rep]||0; const wellOK=!!(D.well&&D.well[T]&&D.well[last]); if(wellOK) s3+=(D.well[T][rep]||0)-(D.well[last][rep]||0); /* ④ 웰체크: 직전월 가산에서 직전월 웰체크를 빼고 이번 달 확정 웰체크를 더한다 */
     if(!wadT && !s2 && !s2x && !s3 && !s1x) continue;
     out[rep]={wad:wadT, wadIn, carry:Math.max(0,carry.byRep[rep]||0), s1, s1x, nConf, s2x, s2, s3, pred:s1+s1x+s2x+s2+s3, xKnown:!!known, wellT:(D.well&&D.well[T]?D.well[T][rep]||0:null)};
@@ -3017,7 +3017,7 @@ function renderForecast(){
     {label:'과거 오차',get:r=>r.btMape==null?'-':'±'+r.btMape.toFixed(1)+'%'});
   const t1=insTable(H,[...rows,F.team],{onClick:repClick});
   const lastTr=t1.querySelector('tbody tr:last-child'); if(lastTr){ lastTr.style.fontWeight='700'; lastTr.style.borderTop='3px double var(--border-strong)'; lastTr.classList.remove('click'); }
-  g1.appendChild(insCard(`담당자별 ${ymLong(F.T)} 평가실적 예측`, `예측 = ① WAD${F.carryOn?'(입력 + 미입력 거래처 전월값)':' 입력'} × 최근 ${FC.recent}개월 환산율(거래처×품목군) + ② 나보타·리브레 등 원내·관계사 덩어리(${F.xKnown?'그 달 확정 파일':'파일이 없어 6개월 평균 — 미확정'}) + ③ 미입력 거래처·기타 소액 최근 ${FC.stable}개월 평균 + ④ 웰체크·직거래·성장금액 가산 직전월 값 · 보통 범위는 과거 평균 오차(±${(F.typRep*100).toFixed(1)}%), 80% 범위는 과거 10번 중 8번이 들어온 폭 · 웰체크는 ${F.wellKnown?'마감현황 확정값(환자 수 × 1만원)':'직전월 값'}`, t1, true));
+  g1.appendChild(insCard(`담당자별 ${ymLong(F.T)} 평가실적 예측`, `예측 = ① WAD${F.carryOn?'(입력 + 미입력 거래처 전월값)':' 입력'} × 최근 ${FC.recent}개월 환산율(거래처×품목군) + ② 나보타·리브레 등 원내·관계사 덩어리(${F.xKnown?'그 달 확정 파일':'파일이 없어 6개월 평균 — 미확정'}) + ③ 미입력 거래처·기타 소액 최근 ${FC.stable}개월 중앙값 + ④ 웰체크·직거래·성장금액 가산 직전월 값 · 보통 범위는 과거 평균 오차(±${(F.typRep*100).toFixed(1)}%), 80% 범위는 과거 10번 중 8번이 들어온 폭 · 웰체크는 ${F.wellKnown?'마감현황 확정값(환자 수 × 1만원)':'직전월 값'}`, t1, true));
   body.appendChild(g1);
   const B=F.BT; const g2=document.createElement('div'); g2.className='ins-grid';
   const sumBox=document.createElement('div'); sumBox.className='fc-acc'; const f1=v=>v==null?'-':v.toFixed(1);
