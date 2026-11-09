@@ -1524,7 +1524,9 @@ function mergeAll(){
     const owner={};
     // 「처방성장률(당월입력처)」처럼 당월 입력 거래처만 담은 보고서는 앞쪽 달이 일부만 들어 있으므로 마지막 달만 반영한다
     const onlyLast=f=>!!f.onlyLast||/당월입력처/.test(f.name||'');
-    for(const f of files){ f.applied=[]; const ms=onlyLast(f)?f.months.slice(-1):f.months; for(const m of ms){ if(!(m in owner)){ owner[m]=f.id; f.applied.push(m);} } }
+    // 확정 평가(CONF)는 한 달에 실매출·DCM·처방실적 파일이 따로 오므로 모두 합산. 같은 파일의 사본(" (1)")·구버전(v2/v3)만 하나로 거른다
+    const baseName=n=>String(n).replace(/\s*\(\d+\)(?=\.\w+$)/,'').replace(/[_ ]?v\d{1,3}(?=[^a-z0-9]|$)/i,'').toLowerCase();
+    for(const f of files){ f.applied=[]; const ms=onlyLast(f)?f.months.slice(-1):f.months; for(const m of ms){ const ok=type==='CONF'?m+'|'+baseName(f.name):m; if(!(ok in owner)){ owner[ok]=f.id; f.applied.push(m);} } }
     const months=Object.keys(owner).sort(); const mi={}; months.forEach((m,i)=>mi[m]=i);
     const map=new Map();
     for(const f of files){
@@ -2892,11 +2894,11 @@ function fcPredict(D, T, opt={}){
   const carry={byRep:{}, n:0, total:0, on:false, P, manualN:0};
   let wT=w0;
   const clone=()=>{ if(wT!==w0) return; wT={byRep:{}, clients:new Set(w0.clients), key:Object.assign({},w0.key)}; for(const [rep,keys] of Object.entries(w0.byRep)) wT.byRep[rep]=Object.assign({},keys); };
-  // 입력 진행 중 보정: 직전 WAD 달(P)에는 있는데 T에 아직 없는 거래처 → P 값을 그대로 넣는다
+  // 입력 진행 중 보정: 직전 WAD 달(P)에는 있는데 T에 아직 없는 거래처×품목군 → P 값을 그대로 넣는다
   if(opt.carry && P && D.wad[P]){
     clone(); carry.on=true; const carried=new Set();
     for(const [rep,keys] of Object.entries(D.wad[P].byRep)) for(const [k,v] of Object.entries(keys)){
-      const c=k.slice(0,k.indexOf('|')); if(w0.clients.has(c)) continue;
+      if(w0.key[k]) continue; const c=k.slice(0,k.indexOf('|')); // 거래처×품목군 단위: 입력 중인 거래처라도 아직 안 넣은 품목군은 전월값으로 채운다
       (wT.byRep[rep]=wT.byRep[rep]||{})[k]=(wT.byRep[rep][k]||0)+v; wT.key[k]=(wT.key[k]||0)+v;
       carry.byRep[rep]=(carry.byRep[rep]||0)+v; carry.total+=v; carried.add(c);
     }
