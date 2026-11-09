@@ -2790,7 +2790,7 @@ $('#gateForm').onsubmit=async e=>{
 $('#gatePw').onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); $('#gateForm').requestSubmit(); } };
 $('#btnLock').onclick=()=>{ try{ localStorage.removeItem('tb.key'); }catch(_){} location.reload(); };
 /* 자동 갱신용 키 파일: 이 브라우저가 직원용 화면을 '기억'으로 연 적이 있으면 그 열기 키(tb.key)를 파일로 내려준다. 비밀번호 자체는 담기지 않는다 */
-$('#btnKeyFile').onclick=()=>{ let raw=null; try{ raw=localStorage.getItem('tb.key'); }catch(_){} if(!raw){ alert('이 브라우저에 저장된 열기 키가 없습니다.\n직원용 화면(주소 끝의 ?admin=1 을 빼고)에서 비밀번호를 \
+$('#btnKeyFile').onclick=()=>{ let raw=null; try{ raw=localStorage.getItem('tb.key'); }catch(_){} if(!raw){ alert('이 브라우저에 저장된 열기 키가 없습니다.\n직원용 화면(주소 끝의 ?admin=1 을 빼고)에서 비밀번호를 「이 브라우저에 기억」으로 한 번 연 뒤 다시 눌러 주세요.'); return; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([raw],{type:'text/plain'})); a.download='tb.key'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); toast('tb.key 를 %LOCALAPPDATA%\\Gyeongin1Board\\ 폴더에 넣어 주세요', 6000); };
 /* ---- PDF 저장: 보고 있는 탭·필터 그대로 A4 가로 한 장에 맞춰 인쇄 (인쇄 창에서 "PDF로 저장") ---- */
 function filterSummary(){
   const parts=[state.mode==='CMP'?'WAD vs 평가실적 비교':TYPE_LABEL[state.mode], `기간 ${ymLong(state.f.from)} ~ ${ymLong(state.f.to)}`];
