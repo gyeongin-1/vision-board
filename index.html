@@ -1527,7 +1527,7 @@ function mergeAll(){
     // 확정 평가(CONF)는 한 달에 실매출·DCM·처방실적 파일이 따로 오므로 모두 합산. 같은 파일의 사본(" (1)")·구버전(v2/v3)만 하나로 거른다
     const baseName=n=>String(n).replace(/\s*\(\d+\)(?=\.\w+$)/,'').replace(/[_ ]?v\d{1,3}(?=[^a-z0-9]|$)/i,'').toLowerCase();
     for(const f of files){ f.applied=[]; const ms=onlyLast(f)?f.months.slice(-1):f.months; for(const m of ms){ const ok=type==='CONF'?m+'|'+baseName(f.name):m; if(!(ok in owner)){ owner[ok]=f.id; f.applied.push(m);} } }
-    const months=Object.keys(owner).sort(); const mi={}; months.forEach((m,i)=>mi[m]=i);
+    const months=[...new Set(files.flatMap(f=>f.applied))].sort(); const mi={}; months.forEach((m,i)=>mi[m]=i); // owner 키에 파일명이 붙을 수 있어(CONF) 적용된 달에서 모은다
     const map=new Map();
     for(const f of files){
       if(!f.applied.length) continue;
