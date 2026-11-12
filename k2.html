@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>경인1 K2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* 경인1 K2 — 구글시트(2026_GI.1)를 데이터로, 요약 → 담당자 → 거래처 순 드릴다운 */
+:root{
+  color-scheme:light;
+  --bg:#f3f5f4; --surface:#fff; --sunk:#e9edeb; --line:#d5dcd8; --ink:#16211d; --ink2:#4a5a53; --ink3:#77867f;
+  --accent:#1d4fb8; --accent-soft:#e1eafb; --bar:#2f6fd6; --bar-dim:#aac4f0;
+  --good:#17703f; --good-bg:#def3e5; --bad:#b3261e; --bad-bg:#fbe4e1; --warn:#8a5a00; --warn-bg:#fbefcf; --info:#1f5fa8; --info-bg:#e1ecf9;
+  --font:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 6px 18px rgba(22,33,29,.06);
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  color-scheme:dark;
+  --bg:#101614; --surface:#18201d; --sunk:#202a26; --line:#2f3b36; --ink:#e7eeea; --ink2:#b1bfb8; --ink3:#84938c;
+  --accent:#7fb0ff; --accent-soft:#1b2d4f; --bar:#5b93ea; --bar-dim:#2f4a78;
+  --good:#6fd39a; --good-bg:#173524; --bad:#ff8f86; --bad-bg:#3d1c1a; --warn:#f0c064; --warn-bg:#3a2e12; --info:#8ebcf2; --info-bg:#172c45;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.3);
+} }
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#101614; --surface:#18201d; --sunk:#202a26; --line:#2f3b36; --ink:#e7eeea; --ink2:#b1bfb8; --ink3:#84938c;
+  --accent:#7fb0ff; --accent-soft:#1b2d4f; --bar:#5b93ea; --bar-dim:#2f4a78;
+  --good:#6fd39a; --good-bg:#173524; --bad:#ff8f86; --bad-bg:#3d1c1a; --warn:#f0c064; --warn-bg:#3a2e12; --info:#8ebcf2; --info-bg:#172c45;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;padding:0 16px 48px}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+
+/* 상단 */
+header.top{position:sticky;top:0;z-index:10;background:var(--bg);padding:12px 0 10px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.brand{font-weight:700;font-size:17px;letter-spacing:-.01em;background:none;border:0;padding:0}
+.back{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:4px 10px;font-size:13px}
+.crumbs{display:flex;flex-wrap:wrap;gap:2px;align-items:center;color:var(--ink3);font-size:13px;flex:1;min-width:0}
+.crumbs button{background:none;border:0;padding:2px 4px;color:var(--ink2);border-radius:4px}
+.crumbs button:hover{background:var(--sunk)}
+.crumbs .here{color:var(--ink);font-weight:600;padding:2px 4px}
+.search{position:relative;display:flex;align-items:center}
+.search input{width:220px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 10px 6px 30px}
+.search::before{content:"🔍";position:absolute;left:9px;font-size:12px;opacity:.7}
+.tbtn{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 11px;font-size:13px;white-space:nowrap}
+.tbtn:hover{background:var(--sunk)}
+.tbtn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .tbtn.primary{color:#0b1830}
+.asof{font-size:12px;color:var(--ink3)}
+
+h1{font-size:22px;margin:0;letter-spacing:-.02em;text-wrap:balance}
+h2{font-size:15px;margin:0;font-weight:600}
+.sub{color:var(--ink2);margin:2px 0 0;max-width:70ch}
+.sec{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.spacer{flex:1}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);min-width:0}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpi .l{font-size:12px;color:var(--ink3)}
+.kpi .v{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-top:2px}
+.kpi .s{font-size:12px;color:var(--ink2)}
+
+/* 메뉴 */
+.menu{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.menu button{display:grid;grid-template-columns:40px 1fr auto;gap:4px 10px;align-items:center;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.menu button:hover{border-color:var(--accent);background:var(--accent-soft)}
+.menu .ic{font-size:22px;grid-row:span 2}
+.menu .t{font-weight:600}
+.menu .d{font-size:12px;color:var(--ink3);grid-column:2}
+.menu .stat{grid-row:1/span 2;grid-column:3;font-weight:700;font-size:15px}
+
+/* 세그먼트 */
+.seg{display:inline-flex;background:var(--sunk);border-radius:8px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{background:none;border:0;border-radius:6px;padding:4px 11px;font-size:13px;color:var(--ink2)}
+.seg button.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.1)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 11px;font-size:13px}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .chip.on{color:#0b1830}
+
+/* 표 */
+.tbox{overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface);max-height:70vh}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{position:sticky;top:0;background:var(--sunk);font-weight:600;color:var(--ink2);font-size:12px;z-index:1}
+td.l,th.l{text-align:left}
+td.name{font-weight:600;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+td.wrap{white-space:normal;min-width:220px;max-width:420px;text-align:left;color:var(--ink2)}
+tr.click{cursor:pointer}
+tr.click:hover td{background:var(--accent-soft)}
+tr.total td{font-weight:700;background:var(--sunk)}
+.empty{color:var(--ink3);padding:18px;text-align:center}
+.muted{color:var(--ink3)}
+.up{color:var(--good)} .down{color:var(--bad)}
+
+/* 등급 */
+.g{display:inline-block;min-width:30px;text-align:center;border-radius:6px;padding:1px 6px;font-weight:700;font-size:12px}
+.g-S,.g-Ap,.g-A{background:var(--good-bg);color:var(--good)}
+.g-Bp,.g-B{background:var(--info-bg);color:var(--info)}
+.g-Cp,.g-C{background:var(--warn-bg);color:var(--warn)}
+.g-D{background:var(--bad-bg);color:var(--bad)}
+.pill{display:inline-block;border-radius:99px;padding:0 8px;font-size:12px;background:var(--sunk);color:var(--ink2)}
+.pill.ok{background:var(--good-bg);color:var(--good)}
+
+/* 성장률 막대 (0 기준 양방향) */
+.rbar{position:relative;width:120px;height:10px;background:var(--sunk);border-radius:3px;display:inline-block;vertical-align:middle;margin-left:8px}
+.rbar::after{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--ink3)}
+.rbar i{position:absolute;top:0;bottom:0;border-radius:2px}
+.rbar i.p{left:50%;background:var(--bar)}
+.rbar i.n{right:50%;background:var(--bad)}
+
+/* 담당자 분기 카드 */
+.qgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.qc{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.qc .h{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--ink3)}
+.qc .v{font-size:22px;font-weight:700;margin-top:4px}
+.qc .s{font-size:12px;color:var(--ink2)}
+
+/* 미니 막대 */
+.mbars{display:flex;align-items:flex-end;gap:3px;height:42px}
+.mbars span{flex:1;min-width:6px;background:var(--bar);border-radius:2px 2px 0 0}
+.mbars span.neg{background:var(--bad)}
+
+/* 게이트 / 가져오기 */
+.gate{max-width:440px;margin:60px auto;text-align:center}
+.gate input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);margin-top:12px}
+.gate .err{color:var(--bad);min-height:20px;margin-top:8px;font-size:13px}
+.drop{border:2px dashed var(--line);border-radius:14px;padding:36px 20px;text-align:center;background:var(--surface)}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop ol{text-align:left;display:inline-block;color:var(--ink2);margin:14px 0 0}
+.note{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:10px 14px;font-size:13px}
+
+/* 검색 결과 */
+.xs-r{display:flex;flex-direction:column;gap:6px}
+.xs-r button{display:flex;gap:10px;align-items:center;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.xs-r button:hover{border-color:var(--accent);background:var(--accent-soft)}
+.xs-r .n{font-weight:600}
+.xs-r .tags{display:flex;flex-wrap:wrap;gap:4px;margin-left:auto}
+
+@media (max-width:720px){
+  .search input{width:100%}
+  .search{flex:1 1 100%}
+  h1{font-size:19px}
+  .rbar{width:70px}
+  th,td{padding:6px 7px}
+}
+@media print{ header.top{position:static} .tbtn,.search{display:none} .tbox{max-height:none;overflow:visible} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <button class="back" id="backBtn" type="button" hidden>↩ 뒤로</button>
+    <button class="brand" id="homeBtn" type="button">경인1 K2</button>
+    <nav class="crumbs" id="crumbs" aria-label="경로"></nav>
+    <label class="search"><input id="q" type="search" placeholder="거래처·약국·담당자 검색" autocomplete="off" aria-label="검색"></label>
+    <span class="asof" id="asof"></span>
+    <button class="tbtn admin-only" id="btnImport" type="button" hidden>📥 시트 엑셀 불러오기</button>
+    <button class="tbtn primary admin-only" id="btnExport" type="button" hidden>🌐 게시용 내보내기</button>
+    <button class="tbtn" id="btnTheme" type="button" title="밝게/어둡게">🌓</button>
+    <a class="tbtn" href="index.html">현황판</a>
+    <button class="tbtn viewer-only" id="btnLock" type="button" hidden title="이 브라우저에 저장된 열기 키를 지웁니다">🔒</button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
+  </header>
+  <main id="main" class="sec"></main>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ADMIN=/[?&]admin=1/.test(location.search);
+const LS={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+
+/* ---------- 테마 ---------- */
+(function(){const t=LS.get('k2.theme'); if(t) document.documentElement.dataset.theme=t;})();
+$('#btnTheme').onclick=()=>{const r=document.documentElement; const dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches; r.dataset.theme=dark?'light':'dark'; LS.set('k2.theme',r.dataset.theme);};
+
+/* ---------- 숫자 ---------- */
+const N=v=>{ if(v==null||v===''||v==='-') return 0; if(typeof v==='number') return isFinite(v)?v:0; const n=parseFloat(String(v).replace(/[,\s원]/g,'')); return isFinite(n)?n:0; };
+const has=v=>!(v==null||v===''||v==='-');
+const f1=v=>(Math.round(v*10)/10).toLocaleString('ko-KR',{minimumFractionDigits:1,maximumFractionDigits:1});
+const f0=v=>Math.round(v).toLocaleString('ko-KR');
+const pct=v=>v==null||!isFinite(v)?'-':(v>=0?'+':'')+(v*100).toFixed(1)+'%';
+const sgn=v=>v>0?'up':v<0?'down':'';
+const won=v=>{ const a=Math.abs(v); if(a>=1e8) return (v/1e8).toFixed(2)+'억'; if(a>=1e4) return f0(v/1e4)+'만'; return f0(v); };
+const gcls=g=>{ if(!g) return ''; const k=String(g).trim().replace('+','p'); return 'g g-'+k; };
+const gpill=g=>g&&String(g).trim()?`<span class="${gcls(g)}">${esc(String(g).trim())}</span>`:'<span class="muted">-</span>';
+const rbar=(r,max)=>{ const w=Math.min(50,Math.abs(r)/(max||0.3)*50); return `<span class="rbar"><i class="${r>=0?'p':'n'}" style="width:${w}%"></i></span>`; };
+const clean=s=>String(s==null?'':s).replace(/\s+/g,' ').trim();
+
+/* =====================================================================
+   시트 → 데이터 묶음 (관리자 브라우저에서만 실행)
+   탭 이름·머리글 글자로 찾으므로 열 위치가 조금 바뀌어도 읽힌다.
+   「경인1 인적사항」처럼 목록에 없는 탭은 읽지 않는다.
+   ===================================================================== */
+const LIST_SHEETS=['바로에젯현황','실리스칸현황','실리스칸','실리스칸대상처','펙수 감소처','이스미젠 타켓처','최고유통','원내/DH','CKD 단독처 방문결과','풀동도대상처','웰체크타겟','OJT 대상처','인턴OJT 대상처','DB 추가처','MKT TOOL'];
+const NAME_HDR=/^(거래처|거래처명|거래쳐명|병원명|의원명|판매처명|요양기관명)$/;
+const REP_HDR=/^(담당자|사원명)$/;
+
+function parsePerf(rows){
+  const out={quarters:[],annual:null,grades:[]};
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i]||[]; const a=clean(r[0]);
+    const qm=a.match(/^([1-4])분기$/);
+    if(qm||(r[0]===2026||a==='2026'||a==='연간')){
+      const hdr=(rows[i+1]||[]).map(clean); if(hdr[0]!=='담당자') continue;
+      const q={q:qm?+qm[1]:0,label:qm?qm[1]+'분기':'연간',months:[],reps:[]};
+      if(qm) for(const c of [9,14,19]){ const ml=clean(r[c]); if(ml) q.months.push({label:ml,col:c}); }
+      for(let j=i+2;j<rows.length;j++){
+        const x=rows[j]||[]; const nm=clean(x[0]); if(!nm||/분기$|^■/.test(nm)||nm==='담당자') break;
+        if(typeof x[1]!=='number') break;
+        const rep={name:nm,base:N(x[1]),final:N(x[2]),growth:N(x[3]),rate:N(x[4]),grade:clean(x[5]),g55:clean(x[6]),tgrade:clean(x[7]),gap:has(x[8])?N(x[8]):null,months:[]};
+        for(const m of q.months){ if(!has(x[m.col+1])&&!has(x[m.col])) {rep.months.push(null);continue;} rep.months.push({base:N(x[m.col]),final:N(x[m.col+1]),growth:N(x[m.col+2]),rate:N(x[m.col+3]),grade:clean(x[m.col+4])}); }
+        q.reps.push(rep);
+      }
+      q.months=q.months.map(m=>m.label);
+      // 같은 분기 표가 아래에 또 있으면(시뮬레이션 등) 위쪽 본표만 쓴다
+      if(q.reps.length){ if(qm){ if(!out.quarters.some(x=>x.q===q.q)) out.quarters.push(q); } else if(!out.annual) out.annual=q; }
+    }
+    if(a==='등급'&&clean(r[1])==='2026년'){
+      for(let j=i+1;j<rows.length;j++){ const x=rows[j]||[]; const g=clean(x[0]); if(!g) break; if(g==='비율') continue; out.grades.push({g,y:x[1],q:[x[2],x[3],x[4],x[5]]}); }
+    }
+  }
+  return out;
+}
+
+function latestSheet(names,re){ let best=null,bm=-1; for(const n of names){ const m=n.match(re); if(m&&+m[1]>bm){bm=+m[1];best=n;} } return best; }
+
+function parseWell(rows,sheet){
+  const out={sheet,month:(sheet.match(/(\d+)월/)||[])[1]||'',summary:[],headers:[],rows:[]};
+  for(let i=0;i<rows.length;i++){
+    const r=(rows[i]||[]).map(clean);
+    const di=r.indexOf('담당자');
+    if(di>=0&&!out.summary.length&&r.slice(di+1).some(h=>/현황/.test(h))){
+      const hdr=r.slice(di+1).filter(Boolean);
+      for(let j=i+1;j<rows.length;j++){ const x=rows[j]||[]; const nm=clean(x[di]); if(!nm) break; out.summary.push({name:nm,v:hdr.map((h,k)=>N(x[di+1+k]))}); }
+      out.sumHdr=hdr;
+    }
+    if(r[0]==='담당자'&&r.some(h=>h==='병원명')){
+      out.headers=r.map(h=>h.replace(/\s+/g,' '));
+      for(let j=i+1;j<rows.length;j++){ const x=rows[j]||[]; if(!clean(x[0])) continue; out.rows.push(out.headers.map((h,k)=>cellOut(x[k]))); }
+      break;
+    }
+  }
+  return out;
+}
+function cellOut(v){ if(v instanceof Date) return v.toISOString().slice(0,10); if(typeof v==='number') return Math.round(v*1000)/1000; return v==null?'':String(v).trim(); }
+
+function parseTable(rows,sheet){ // 여러 구역(■ 제목 + 머리글)을 가진 일반 목록
+  const out=[]; let title=sheet, cur=null;
+  for(let i=0;i<rows.length;i++){
+    const r=(rows[i]||[]).map(clean);
+    const first=r.find(Boolean)||'';
+    if(/^■|^★/.test(first)&&r.filter(Boolean).length<=2){ title=first.replace(/^[■★]\s*/,''); cur=null; continue; }
+    const ri=r.findIndex(h=>REP_HDR.test(h)), ni=r.findIndex(h=>NAME_HDR.test(h));
+    if(ri>=0&&ni>=0){ cur={sheet,title,headers:r.map(h=>h.replace(/\s+/g,' ')),ri,ni,rows:[]}; out.push(cur); continue; }
+    if(cur){ const rep=clean((rows[i]||[])[cur.ri]), nm=clean((rows[i]||[])[cur.ni]); if(rep&&nm) cur.rows.push(cur.headers.map((h,k)=>cellOut((rows[i]||[])[k]))); }
+  }
+  return out.filter(t=>t.rows.length).map(t=>{ // 비어 있는 열은 뺀다
+    const keep=t.headers.map((h,k)=>k===t.ri||k===t.ni||(h&&t.rows.some(r=>has(r[k])&&r[k]!==0)));
+    const idx=t.headers.map((_,k)=>k).filter(k=>keep[k]);
+    return {sheet:t.sheet,title:t.title,headers:idx.map(k=>t.headers[k]),ri:idx.indexOf(t.ri),ni:idx.indexOf(t.ni),rows:t.rows.map(r=>idx.map(k=>r[k]))};
+  });
+}
+
+function parseDirect(rows){
+  const out={months:[],rows:[]};
+  const hi=rows.findIndex(r=>(r||[]).some(c=>clean(c)==='판매처명')); if(hi<0) return out;
+  const h=rows[hi].map(clean);
+  const ni=h.indexOf('판매처명'), ai=h.indexOf('주소'), ri=h.indexOf('사원명');
+  const cols={}; h.forEach((x,k)=>{ const m=x.match(/^(대웅|바이오|한올|합계)\((\d+)월\)$/); if(m){ (cols[m[2]]=cols[m[2]]||{})[m[1]]=k; } });
+  out.months=Object.keys(cols).map(Number).sort((a,b)=>a-b);
+  for(let i=hi+1;i<rows.length;i++){
+    const x=rows[i]||[]; const nm=clean(x[ni]); if(!nm) continue;
+    const v=out.months.map(m=>{ const c=cols[m]; return [N(x[c['대웅']]),N(x[c['바이오']]),N(x[c['한올']]),c['합계']!=null?N(x[c['합계']]):N(x[c['대웅']])+N(x[c['바이오']])+N(x[c['한올']])]; });
+    out.rows.push([nm,clean(x[ai]),clean(x[ri]),v]);
+  }
+  return out;
+}
+
+function parsePexu(rows,sheet){
+  for(let i=0;i<rows.length;i++){
+    const r=(rows[i]||[]).map(clean); const di=r.indexOf('담당자'); if(di<0) continue;
+    const labels=[]; for(let k=di+1;k<r.length&&r[k];k++) labels.push(r[k]);
+    if(!labels.length) continue;
+    const reps=[]; for(let j=i+1;j<rows.length;j++){ const x=rows[j]||[]; const nm=clean(x[di]); if(!nm) break; reps.push({name:nm,v:labels.map((_,k)=>N(x[di+1+k]))}); }
+    return {sheet,labels,reps};
+  }
+  return null;
+}
+
+function buildFromWorkbook(wb){
+  const S=n=>wb.Sheets[n]?XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,cellDates:true}):null;
+  const names=wb.SheetNames;
+  const b={fmt:'k2-1',exportedAt:new Date().toISOString(),source:'2026_GI.1',perf:null,well:null,welda:null,direct:null,pexu:null,lists:[]};
+  const perfName=names.find(n=>/^20\d\d 실적$/.test(n))||names.find(n=>n==='실적현황');
+  if(perfName) b.perf=parsePerf(S(perfName));
+  const wn=latestSheet(names,/^(\d+)월 웰체크$/); if(wn) b.well=parseWell(S(wn),wn);
+  if(wb.Sheets['웰다']){ const t=parseTable(S('웰다'),'웰다'); b.welda=t[0]||null; }
+  if(wb.Sheets['직거래현황']) b.direct=parseDirect(S('직거래현황'));
+  const pn=latestSheet(names,/^(\d+)월 펙수 예측$/); if(pn) b.pexu=parsePexu(S(pn),pn);
+  for(const n of LIST_SHEETS) if(wb.Sheets[n]) b.lists.push(...parseTable(S(n),n));
+  return b;
+}
+
+/* =====================================================================
+   암호화 — 현황판(index.html)과 같은 형식·같은 소금(tb.pubSalt)을 쓴다.
+   같은 비밀번호로 내보내면 현황판을 「기억」으로 연 직원은 비밀번호 없이 열린다.
+   ===================================================================== */
+const KDF_ITER=310000, te=new TextEncoder(), td=new TextDecoder();
+function b64enc(u8){ let s=''; for(let i=0;i<u8.length;i+=0x8000) s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000)); return btoa(s); }
+function b64dec(s){ const b=atob(s); const u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return u; }
+async function gz(u8){ if(typeof CompressionStream==='undefined') return null; return new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()); }
+async function gunz(u8){ return new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()); }
+function subtle(){ if(!window.crypto||!crypto.subtle) throw new Error('https 주소로 열어야 합니다'); return crypto.subtle; }
+async function deriveKey(pw,salt,iter){ const base=await subtle().importKey('raw',te.encode(pw),'PBKDF2',false,['deriveKey']); return subtle().deriveKey({name:'PBKDF2',hash:'SHA-256',salt,iterations:iter||KDF_ITER},base,{name:'AES-GCM',length:256},true,['encrypt','decrypt']); }
+function pubSalt(){ const s=LS.get('tb.pubSalt'); if(s) return b64dec(s); const u=crypto.getRandomValues(new Uint8Array(16)); LS.set('tb.pubSalt',b64enc(u)); return u; }
+async function encrypt(bundle,pw){
+  const plain=te.encode(JSON.stringify(bundle)); const z=await gz(plain);
+  const salt=pubSalt(), iv=crypto.getRandomValues(new Uint8Array(12)); const key=await deriveKey(pw,salt,KDF_ITER);
+  const ct=new Uint8Array(await subtle().encrypt({name:'AES-GCM',iv},key,z||plain));
+  return {fmt:'tb-enc-1',kdf:'PBKDF2-SHA256',iter:KDF_ITER,salt:b64enc(salt),iv:b64enc(iv),gz:!!z,at:bundle.exportedAt,ct:b64enc(ct)};
+}
+async function decrypt(env,key){ if(!env||env.fmt!=='tb-enc-1') throw new Error('알 수 없는 데이터 파일 형식'); const pt=new Uint8Array(await subtle().decrypt({name:'AES-GCM',iv:b64dec(env.iv)},key,b64dec(env.ct))); return JSON.parse(td.decode(env.gz?await gunz(pt):pt)); }
+
+/* =====================================================================
+   상태 · 라우팅
+   ===================================================================== */
+let D=null; // 데이터 묶음
+let route={v:'home'}; const hist=[];
+const ui={q:null,wcRep:'',dtRep:'',dtSort:'sum',dtQ:'',dtMonth:'all'};
+function go(r,push=true){ if(push) hist.push(route); route=r; render(); window.scrollTo(0,0); }
+$('#backBtn').onclick=()=>{ if(hist.length){ route=hist.pop(); render(); } };
+$('#homeBtn').onclick=()=>{ if(D) go({v:'home'}); };
+let qT=null; $('#q').oninput=e=>{ clearTimeout(qT); const v=e.target.value.trim(); qT=setTimeout(()=>{ if(!D) return; if(v) { if(route.v==='xs'){ route.q=v; render(); } else go({v:'xs',q:v}); } },180); };
+
+const VIEW_NAME={home:'요약',rep:'담당자',wc:'웰체크·웰다',dt:'직거래',xs:'검색',client:'거래처'};
+function crumbs(){
+  const parts=[`<button data-go="home">요약</button>`];
+  if(route.v==='rep') parts.push(`<span>›</span><span class="here">${esc(route.name)}</span>`);
+  else if(route.v==='client') parts.push(`<span>›</span><span class="here">${esc(route.name)}</span>`);
+  else if(route.v!=='home') parts.push(`<span>›</span><span class="here">${VIEW_NAME[route.v]}</span>`);
+  $('#crumbs').innerHTML=route.v==='home'?'<span class="here">요약</span>':parts.join('');
+  $('#crumbs').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go({v:b.dataset.go}));
+  $('#backBtn').hidden=!hist.length||route.v==='home';
+}
+
+/* 공통: 담당자 목록 (실적 탭 기준, 사무소 합계 행 제외) */
+const OFFICE_ROW=/^(경인1|사무소 합계|합계)$/;
+function reps(){ const q=D.perf&&(D.perf.annual||D.perf.quarters[0]); return q?q.reps.filter(r=>!OFFICE_ROW.test(r.name)).map(r=>r.name):[]; }
+function curQuarter(){ const qs=(D.perf&&D.perf.quarters)||[]; let last=qs[0]; for(const q of qs){ if(q.reps.some(r=>r.months.some(m=>m&&m.final))) last=q; } return last; }
+
+/* ---------- 요약(홈) ---------- */
+function vHome(){
+  const P=D.perf; const qs=P?P.quarters:[];
+  const sel=route.q!=null?route.q:(curQuarter()?curQuarter().q:0);
+  const Q=sel===0?P&&P.annual:qs.find(q=>q.q===sel);
+  const office=Q?Q.reps.find(r=>OFFICE_ROW.test(r.name)):null;
+  const list=Q?Q.reps.filter(r=>!OFFICE_ROW.test(r.name)):[];
+  const maxR=Math.max(0.1,...list.map(r=>Math.abs(r.rate)));
+  const wellTot=D.well&&D.well.summary.find(s=>OFFICE_ROW.test(s.name));
+  const dtTot=D.direct?D.direct.rows.reduce((s,r)=>s+r[3].reduce((a,m)=>a+m[3],0),0):0;
+  const listCnt=D.lists.reduce((s,t)=>s+t.rows.length,0);
+  let h=`<div class="sec"><h1>경인1 K2 · ${Q?esc(Q.label):''} 성장률 평가</h1><p class="sub">「${esc(D.source||'2026_GI.1')}」 시트 기준 · 금액 단위 백만원 · 담당자를 누르면 담당자 화면으로 들어갑니다.</p></div>`;
+  h+=`<div class="row"><div class="seg" id="qseg">${qs.map(q=>`<button data-q="${q.q}" class="${q.q===sel?'on':''}">${q.q}분기</button>`).join('')}${P&&P.annual?`<button data-q="0" class="${sel===0?'on':''}">연간</button>`:''}</div></div>`;
+  if(office){
+    h+=`<div class="kpis">
+      <div class="kpi"><div class="l">사무소 성장률</div><div class="v num ${sgn(office.rate)}">${pct(office.rate)}</div><div class="s">현 등급 ${gpill(office.grade)}${office.tgrade?` · 목표 ${gpill(office.tgrade)}`:''}</div></div>
+      <div class="kpi"><div class="l">최종실적 / 기준점</div><div class="v num">${f1(office.final)}</div><div class="s num">기준점 ${f1(office.base)} · 성장 <b class="${sgn(office.growth)}">${(office.growth>=0?'+':'')+f1(office.growth)}</b></div></div>
+      ${office.gap!=null&&office.gap!==0?`<div class="kpi"><div class="l">목표까지 GAP</div><div class="v num">${f1(office.gap)}</div><div class="s">목표 등급 ${gpill(office.tgrade)}</div></div>`:''}
+      ${wellTot?`<div class="kpi"><div class="l">${esc(D.well.month)}월 웰체크 활성처</div><div class="v num">${f0(wellTot.v[wellTot.v.length-1])}</div><div class="s">${D.well.sumHdr.map((x,k)=>`${esc(x)} ${f0(wellTot.v[k])}`).join(' · ')}</div></div>`:''}
+    </div>`;
+  }
+  h+=`<div class="tbox"><table><thead><tr><th class="l">담당자</th><th>기준점</th><th>최종실적</th><th>성장금액</th><th class="l">성장률</th><th>현 등급</th><th>목표 등급</th><th>목표 GAP</th>${Q?Q.months.map(m=>`<th>${esc(m)}</th>`).join(''):''}</tr></thead><tbody>`;
+  for(const r of list){
+    h+=`<tr class="click" data-rep="${esc(r.name)}"><td class="l name">${esc(r.name)}</td><td class="num">${f1(r.base)}</td><td class="num">${f1(r.final)}</td><td class="num ${sgn(r.growth)}">${(r.growth>=0?'+':'')+f1(r.growth)}</td><td class="l num"><span class="${sgn(r.rate)}" style="display:inline-block;width:58px;text-align:right">${pct(r.rate)}</span>${rbar(r.rate,maxR)}</td><td>${gpill(r.grade)}</td><td>${gpill(r.tgrade)}</td><td class="num">${r.gap!=null&&r.gap!==0?f1(r.gap):'<span class="muted">-</span>'}</td>${r.months.map(m=>m?`<td class="num"><span class="${sgn(m.rate)}">${pct(m.rate)}</span> ${m.grade?gpill(m.grade):''}</td>`:'<td class="muted">-</td>').join('')}</tr>`;
+  }
+  if(office) h+=`<tr class="total"><td class="l">${esc(office.name)}</td><td class="num">${f1(office.base)}</td><td class="num">${f1(office.final)}</td><td class="num ${sgn(office.growth)}">${(office.growth>=0?'+':'')+f1(office.growth)}</td><td class="l num"><span class="${sgn(office.rate)}" style="display:inline-block;width:58px;text-align:right">${pct(office.rate)}</span>${rbar(office.rate,maxR)}</td><td>${gpill(office.grade)}</td><td>${gpill(office.tgrade)}</td><td class="num">${office.gap?f1(office.gap):'-'}</td>${office.months.map(m=>m?`<td class="num"><span class="${sgn(m.rate)}">${pct(m.rate)}</span> ${m.grade?gpill(m.grade):''}</td>`:'<td>-</td>').join('')}</tr>`;
+  h+=`</tbody></table></div>`;
+  if(!Q) h+=`<div class="empty">실적 탭(2026 실적)을 찾지 못했습니다.</div>`;
+  if(P&&P.grades.length){
+    const qi=sel>0?sel-1:-1;
+    h+=`<details class="card"><summary><b>등급 기준</b> <span class="muted">(${sel>0?sel+'분기':'연간'} 성장률)</span></summary><div class="row" style="margin-top:10px">${P.grades.map(g=>{ const v=qi>=0?g.q[qi]:g.y; return `<span>${gpill(g.g)} <span class="num muted">${typeof v==='number'?(v*100).toFixed(1)+'%↑':esc(v)}</span></span>`; }).join('')}</div></details>`;
+  }
+  h+=`<div class="sec"><h2>바로가기</h2><div class="menu">
+    <button data-go="wc"><span class="ic">💚</span><span class="t">웰체크 · 웰다</span><span class="d">${D.well?esc(D.well.sheet)+' · 병원 '+D.well.rows.length+'곳':'데이터 없음'}${D.welda?' · 웰다 '+D.welda.rows.length+'곳':''}</span><span class="stat num">${wellTot?f0(wellTot.v[wellTot.v.length-1]):''}</span></button>
+    <button data-go="dt"><span class="ic">🏪</span><span class="t">직거래</span><span class="d">${D.direct?'약국 '+D.direct.rows.length+'곳 · '+D.direct.months.length+'개월':'데이터 없음'}</span><span class="stat num">${dtTot?won(dtTot):''}</span></button>
+    <button data-go="xs"><span class="ic">🔍</span><span class="t">거래처 · 품목 찾기</span><span class="d">관리 목록 ${D.lists.length}개 · ${listCnt}행</span><span class="stat"></span></button>
+  </div></div>`;
+  if(D.pexu&&D.pexu.reps.length){
+    const pr=D.pexu.reps.filter(r=>!OFFICE_ROW.test(r.name));
+    const mx=Math.max(1,...pr.flatMap(r=>r.v));
+    h+=`<div class="sec"><h2>펙수 월별 <span class="muted" style="font-weight:400">· ${esc(D.pexu.sheet)}</span></h2><div class="qgrid">${pr.map(r=>`<button class="qc" data-rep="${esc(r.name)}" style="text-align:left"><div class="h"><b style="color:var(--ink)">${esc(r.name)}</b><span class="num">${esc(D.pexu.labels[D.pexu.labels.length-1])}</span></div><div class="v num" style="font-size:18px">${f0(r.v[r.v.length-1])}</div><div class="mbars" title="${D.pexu.labels.map((l,k)=>l+': '+f0(r.v[k])).join('\n')}">${r.v.map((v,k)=>`<span style="height:${Math.max(4,v/mx*100)}%;${/예측/.test(D.pexu.labels[k])?'background:var(--bar-dim)':''}"></span>`).join('')}</div></button>`).join('')}</div></div>`;
+  }
+  $('#main').innerHTML=h;
+  $('#qseg')&&$('#qseg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ route.q=+b.dataset.q; render(); });
+  bindCommon();
+}
+
+/* ---------- 담당자 ---------- */
+function vRep(){
+  const name=route.name; const P=D.perf;
+  let h=`<div class="sec"><h1>${esc(name)}</h1><p class="sub">분기 성장률 · 월별 실적 · 담당 거래처</p></div>`;
+  if(P){
+    const cards=P.quarters.map(q=>{ const r=q.reps.find(x=>x.name===name); return r?`<div class="qc"><div class="h"><span>${q.q}분기</span>${gpill(r.grade||r.g55)}</div><div class="v num ${sgn(r.rate)}">${pct(r.rate)}</div><div class="s num">${f1(r.final)} / 기준 ${f1(r.base)}${r.tgrade?` · 목표 ${esc(r.tgrade)}`:''}</div></div>`:''; });
+    const an=P.annual&&P.annual.reps.find(x=>x.name===name);
+    if(an) cards.push(`<div class="qc" style="border-color:var(--accent)"><div class="h"><span>연간</span>${gpill(an.grade)}</div><div class="v num ${sgn(an.rate)}">${pct(an.rate)}</div><div class="s num">${f1(an.final)} / 기준 ${f1(an.base)}</div></div>`);
+    h+=`<div class="qgrid">${cards.join('')}</div>`;
+    const ms=[]; for(const q of P.quarters){ const r=q.reps.find(x=>x.name===name); if(r) r.months.forEach((m,k)=>{ if(m) ms.push({label:q.months[k],...m}); }); }
+    if(ms.length){
+      h+=`<div class="tbox"><table><thead><tr><th class="l">월</th><th>기준점</th><th>최종실적</th><th>성장금액</th><th class="l">성장률</th><th>등급</th></tr></thead><tbody>${ms.map(m=>`<tr><td class="l">${esc(m.label)}</td><td class="num">${f1(m.base)}</td><td class="num">${f1(m.final)}</td><td class="num ${sgn(m.growth)}">${(m.growth>=0?'+':'')+f1(m.growth)}</td><td class="l num"><span class="${sgn(m.rate)}" style="display:inline-block;width:58px;text-align:right">${pct(m.rate)}</span>${rbar(m.rate,0.3)}</td><td>${gpill(m.grade)}</td></tr>`).join('')}</tbody></table></div>`;
+    }
+  }
+  // 웰체크
+  if(D.well){ const W=D.well; const s=W.summary.find(x=>x.name===name); const rows=W.rows.filter(r=>r[0]===name);
+    if(s||rows.length) h+=`<div class="sec"><h2>💚 ${esc(W.sheet)} ${s?`<span class="muted" style="font-weight:400">· ${W.sumHdr.map((x,k)=>esc(x)+' '+f0(s.v[k])).join(' · ')}</span>`:''}</h2>${wellTable(rows,true)}</div>`; }
+  if(D.welda){ const rows=D.welda.rows.filter(r=>r[D.welda.ri]===name); if(rows.length) h+=`<div class="sec"><h2>웰다 단계</h2>${genTable(D.welda,rows,true)}</div>`; }
+  if(D.direct){ const rows=D.direct.rows.filter(r=>r[2]===name); if(rows.length){ h+=`<div class="sec"><h2>🏪 직거래 약국 ${rows.length}곳</h2>${directTable(rows,'all',30)}</div>`; } }
+  const lists=D.lists.map(t=>({t,rows:t.rows.filter(r=>r[t.ri]===name)})).filter(x=>x.rows.length);
+  if(lists.length){ h+=`<div class="sec"><h2>관리 목록</h2>${lists.map(x=>`<details class="card"><summary><b>${esc(x.t.title)}</b> <span class="muted">${x.t.title!==x.t.sheet?esc(x.t.sheet)+' · ':''}${x.rows.length}곳</span></summary><div style="margin-top:10px">${genTable(x.t,x.rows,true)}</div></details>`).join('')}</div>`; }
+  $('#main').innerHTML=h; bindCommon();
+}
+
+/* 일반 표 (거래처 이름 누르면 거래처 화면) */
+function genTable(t,rows,hideRep){
+  const cols=t.headers.map((h,k)=>k).filter(k=>!(hideRep&&k===t.ri)&&t.headers[k]);
+  return `<div class="tbox"><table><thead><tr>${cols.map(k=>`<th class="${k===t.ni||k===t.ri?'l':''}">${esc(t.headers[k])}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr class="click" data-client="${esc(r[t.ni])}">${cols.map(k=>cell(r[k],k===t.ni,k===t.ri)).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+function cell(v,isName,isRep){
+  if(isName) return `<td class="l name">${esc(v)}</td>`;
+  if(isRep) return `<td class="l">${esc(v)}</td>`;
+  if(typeof v==='number') return `<td class="num">${Number.isInteger(v)?f0(v):(Math.abs(v)<1?(v*100).toFixed(1)+'%':f1(v))}</td>`;
+  const s=String(v||''); if(s.length>24) return `<td class="wrap">${esc(s)}</td>`;
+  return `<td class="${/^[OX○×]$/.test(s)?'':'l'}">${esc(s)}</td>`;
+}
+function wellTable(rows,hideRep){
+  const W=D.well; if(!rows.length) return '<div class="empty">해당 병원이 없습니다.</div>';
+  const t={headers:W.headers,ri:0,ni:W.headers.indexOf('병원명')};
+  const keep=W.headers.map((h,k)=>h&&!/사업자/.test(h)&&(k===t.ri||k===t.ni||rows.some(r=>has(r[k])&&r[k]!==0)));
+  const cols=W.headers.map((_,k)=>k).filter(k=>keep[k]&&!(hideRep&&k===0));
+  const sorted=rows.slice().sort((a,b)=>(b[1]==='해당')-(a[1]==='해당'));
+  return `<div class="tbox"><table><thead><tr>${cols.map(k=>`<th class="${k===t.ni||k===0?'l':''}">${esc(W.headers[k])}</th>`).join('')}</tr></thead><tbody>${sorted.map(r=>`<tr class="click" data-client="${esc(r[t.ni])}">${cols.map(k=>k===1?`<td class="l">${r[1]==='해당'?'<span class="pill ok">활성</span>':''}</td>`:cell(r[k],k===t.ni,k===0)).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+
+/* ---------- 웰체크 · 웰다 ---------- */
+function vWc(){
+  const W=D.well; let h=`<div class="sec"><h1>웰체크 · 웰다</h1><p class="sub">${W?esc(W.sheet)+' 탭 기준':'웰체크 탭 없음'}${D.welda?' · 웰다 탭':''}</p></div>`;
+  if(W&&W.summary.length){
+    h+=`<div class="tbox"><table><thead><tr><th class="l">담당자</th>${W.sumHdr.map(x=>`<th>${esc(x)}</th>`).join('')}<th>병원</th></tr></thead><tbody>${W.summary.map(s=>`<tr class="${OFFICE_ROW.test(s.name)?'total':'click'}" ${OFFICE_ROW.test(s.name)?'':`data-wcrep="${esc(s.name)}"`}><td class="l name">${esc(s.name)}</td>${s.v.map(v=>`<td class="num">${f0(v)}</td>`).join('')}<td class="num muted">${OFFICE_ROW.test(s.name)?W.rows.length:W.rows.filter(r=>r[0]===s.name).length}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  if(W){
+    const rs=[...new Set(W.rows.map(r=>r[0]))];
+    h+=`<div class="row"><div class="chips" id="wcChips"><button class="chip ${!ui.wcRep?'on':''}" data-r="">전체</button>${rs.map(r=>`<button class="chip ${ui.wcRep===r?'on':''}" data-r="${esc(r)}">${esc(r)}</button>`).join('')}</div></div>`;
+    const rows=W.rows.filter(r=>!ui.wcRep||r[0]===ui.wcRep);
+    h+=`<div class="sec"><h2>병원 ${rows.length}곳 <span class="muted" style="font-weight:400">· 활성 ${rows.filter(r=>r[1]==='해당').length}곳</span></h2>${wellTable(rows,!!ui.wcRep)}</div>`;
+  }
+  if(D.welda){
+    const T=D.welda; const si=T.headers.indexOf('단계'); const stages=si>=0?[...new Set(T.rows.map(r=>r[si]))]:[];
+    const rs=[...new Set(T.rows.map(r=>r[T.ri]))];
+    h+=`<div class="sec"><h2>웰다 단계별 현황</h2>`;
+    if(si>=0) h+=`<div class="tbox"><table><thead><tr><th class="l">담당자</th>${stages.map(s=>`<th>${esc(s)}</th>`).join('')}<th>합계</th></tr></thead><tbody>${rs.map(r=>{ const mine=T.rows.filter(x=>x[T.ri]===r); return `<tr class="click" data-rep="${esc(r)}"><td class="l name">${esc(r)}</td>${stages.map(s=>`<td class="num">${mine.filter(x=>x[si]===s).length||'<span class="muted">0</span>'}</td>`).join('')}<td class="num">${mine.length}</td></tr>`; }).join('')}<tr class="total"><td class="l">합계</td>${stages.map(s=>`<td class="num">${T.rows.filter(x=>x[si]===s).length}</td>`).join('')}<td class="num">${T.rows.length}</td></tr></tbody></table></div>`;
+    const rows=T.rows.filter(r=>!ui.wcRep||r[T.ri]===ui.wcRep);
+    h+=genTable(T,rows,false)+`</div>`;
+  }
+  $('#main').innerHTML=h;
+  $('#wcChips')&&$('#wcChips').querySelectorAll('button').forEach(b=>b.onclick=()=>{ ui.wcRep=b.dataset.r; render(); });
+  $('#main').querySelectorAll('[data-wcrep]').forEach(tr=>tr.onclick=()=>{ ui.wcRep=tr.dataset.wcrep; render(); });
+  bindCommon();
+}
+
+/* ---------- 직거래 ---------- */
+const CO=['대웅','바이오','한올','합계'];
+function dSum(r,mi){ return mi==='all'?r[3].reduce((a,m)=>a+m[3],0):r[3][mi][3]; }
+function directTable(rows,mi,limit){
+  const M=D.direct.months;
+  const sorted=rows.slice().sort((a,b)=>dSum(b,mi)-dSum(a,mi));
+  const shown=limit?sorted.slice(0,limit):sorted;
+  let h=`<div class="tbox"><table><thead><tr><th class="l">약국</th><th class="l">담당</th>${M.map(m=>`<th>${m}월</th>`).join('')}<th>합계</th></tr></thead><tbody>`;
+  for(const r of shown){ const tot=r[3].reduce((a,m)=>a+m[3],0); h+=`<tr class="click" data-client="${esc(r[0])}"><td class="l name" title="${esc(r[1])}">${esc(r[0])}</td><td class="l">${esc(r[2])}</td>${r[3].map(m=>`<td class="num ${m[3]<0?'down':''}">${m[3]?f0(m[3]):'<span class="muted">-</span>'}</td>`).join('')}<td class="num"><b>${f0(tot)}</b></td></tr>`; }
+  h+=`</tbody></table></div>`;
+  if(limit&&sorted.length>limit) h+=`<div class="muted" style="font-size:12px">상위 ${limit}곳만 표시 · 전체는 「직거래」 화면에서 볼 수 있습니다</div>`;
+  return h;
+}
+function vDt(){
+  const T=D.direct; let h=`<div class="sec"><h1>직거래</h1><p class="sub">직거래현황 탭 · 대웅 / 바이오 / 한올 월별 실적 (원)</p></div>`;
+  if(!T||!T.rows.length){ $('#main').innerHTML=h+'<div class="empty">직거래현황 탭이 없습니다.</div>'; bindCommon(); return; }
+  const M=T.months; const rs=[...new Set(T.rows.map(r=>r[2]).filter(Boolean))];
+  // 담당자 × 월 합계
+  h+=`<div class="tbox"><table><thead><tr><th class="l">담당자</th>${M.map(m=>`<th>${m}월</th>`).join('')}<th>합계</th><th>약국</th></tr></thead><tbody>`;
+  const tot=M.map(()=>0);
+  for(const rp of rs){ const mine=T.rows.filter(r=>r[2]===rp); const v=M.map((_,k)=>mine.reduce((a,r)=>a+r[3][k][3],0)); v.forEach((x,k)=>tot[k]+=x); h+=`<tr class="click ${ui.dtRep===rp?'total':''}" data-dtrep="${esc(rp)}"><td class="l name">${esc(rp)}</td>${v.map(x=>`<td class="num">${won(x)}</td>`).join('')}<td class="num"><b>${won(v.reduce((a,b)=>a+b,0))}</b></td><td class="num muted">${mine.length}</td></tr>`; }
+  h+=`<tr class="total"><td class="l">합계</td>${tot.map(x=>`<td class="num">${won(x)}</td>`).join('')}<td class="num">${won(tot.reduce((a,b)=>a+b,0))}</td><td class="num">${T.rows.length}</td></tr></tbody></table></div>`;
+  // 회사별
+  const co=[0,1,2].map(c=>T.rows.reduce((a,r)=>a+r[3].reduce((s,m)=>s+m[c],0),0));
+  h+=`<div class="kpis">${co.map((v,c)=>`<div class="kpi"><div class="l">${CO[c]} 누계</div><div class="v num">${won(v)}</div></div>`).join('')}</div>`;
+  h+=`<div class="row"><div class="chips" id="dtChips"><button class="chip ${!ui.dtRep?'on':''}" data-r="">전체</button>${rs.map(r=>`<button class="chip ${ui.dtRep===r?'on':''}" data-r="${esc(r)}">${esc(r)}</button>`).join('')}</div><span class="spacer"></span><select id="dtMonth" class="tbtn"><option value="all">전체 기간 순</option>${M.map((m,k)=>`<option value="${k}" ${String(ui.dtMonth)===String(k)?'selected':''}>${m}월 순</option>`).join('')}</select></div>`;
+  const rows=T.rows.filter(r=>(!ui.dtRep||r[2]===ui.dtRep)&&r[3].some(m=>m[3]));
+  h+=`<div class="sec"><h2>약국 ${rows.length}곳 <span class="muted" style="font-weight:400">(실적 있는 곳)</span></h2>${directTable(rows,ui.dtMonth==='all'?'all':+ui.dtMonth,ui.dtRep?0:100)}</div>`;
+  $('#main').innerHTML=h;
+  $('#dtChips').querySelectorAll('button').forEach(b=>b.onclick=()=>{ ui.dtRep=b.dataset.r; render(); });
+  $('#main').querySelectorAll('[data-dtrep]').forEach(tr=>tr.onclick=()=>{ ui.dtRep=ui.dtRep===tr.dataset.dtrep?'':tr.dataset.dtrep; render(); });
+  $('#dtMonth').onchange=e=>{ ui.dtMonth=e.target.value; render(); };
+  bindCommon();
+}
+
+/* ---------- 검색 / 거래처 ---------- */
+const norm=s=>String(s||'').replace(/\s+/g,'').replace(/의원$|내과의원$/,m=>m).toLowerCase();
+function indexAll(){
+  if(D._idx) return D._idx; const m=new Map();
+  const add=(name,rep,tag)=>{ const n=clean(name); if(!n) return; const k=n.replace(/\s+/g,''); const e=m.get(k)||{name:n,reps:new Set(),tags:new Set()}; if(rep) e.reps.add(rep); e.tags.add(tag); m.set(k,e); };
+  if(D.well){ const ni=D.well.headers.indexOf('병원명'); D.well.rows.forEach(r=>add(r[ni],r[0],'웰체크')); }
+  if(D.welda) D.welda.rows.forEach(r=>add(r[D.welda.ni],r[D.welda.ri],'웰다'));
+  if(D.direct) D.direct.rows.forEach(r=>add(r[0],r[2],'직거래'));
+  D.lists.forEach(t=>t.rows.forEach(r=>add(r[t.ni],r[t.ri],t.sheet)));
+  return D._idx=[...m.values()];
+}
+function vXs(){
+  const q=(route.q||'').trim(); const qq=q.replace(/\s+/g,'').toLowerCase();
+  let h=`<div class="sec"><h1>거래처 · 품목 찾기</h1><p class="sub">웰체크 · 웰다 · 직거래 · 관리 목록(${D.lists.map(t=>t.sheet).filter((v,i,a)=>a.indexOf(v)===i).join(', ')})을 한꺼번에 찾습니다. 위 검색창에 입력하세요.</p></div>`;
+  if(!qq){ // 목록별 바로가기
+    const by={}; D.lists.forEach(t=>{ (by[t.sheet]=by[t.sheet]||[]).push(t); });
+    h+=`<div class="sec">${Object.entries(by).map(([s,ts])=>`<details class="card"><summary><b>${esc(s)}</b> <span class="muted">${ts.reduce((a,t)=>a+t.rows.length,0)}행</span></summary>${ts.map(t=>`<div style="margin-top:10px">${ts.length>1||t.title!==s?`<div class="muted" style="margin-bottom:4px">${esc(t.title)}</div>`:''}${genTable(t,t.rows,false)}</div>`).join('')}</details>`).join('')}</div>`;
+    $('#main').innerHTML=h; bindCommon(); return;
+  }
+  const repHit=reps().filter(r=>r.includes(q));
+  const res=indexAll().filter(e=>e.name.replace(/\s+/g,'').toLowerCase().includes(qq)||[...e.tags].some(t=>t.toLowerCase().includes(qq))).slice(0,200);
+  if(repHit.length) h+=`<div class="xs-r">${repHit.map(r=>`<button data-rep="${esc(r)}"><span>👤</span><span class="n">${esc(r)}</span><span class="tags"><span class="pill">담당자</span></span></button>`).join('')}</div>`;
+  h+=`<div class="muted">「${esc(q)}」 거래처 ${res.length}곳${res.length>=200?' (200곳까지만 표시)':''}</div><div class="xs-r">${res.map(e=>`<button data-client="${esc(e.name)}"><span class="n">${esc(e.name)}</span><span class="muted">${esc([...e.reps].join(', '))}</span><span class="tags">${[...e.tags].map(t=>`<span class="pill">${esc(t)}</span>`).join('')}</span></button>`).join('')}</div>`;
+  if(!res.length&&!repHit.length) h+=`<div class="empty">찾는 거래처가 없습니다.</div>`;
+  $('#main').innerHTML=h; bindCommon();
+}
+function vClient(){
+  const name=route.name; const k=name.replace(/\s+/g,''); const same=v=>clean(v).replace(/\s+/g,'')===k;
+  let h=`<div class="sec"><h1>${esc(name)}</h1></div>`; let n=0;
+  if(D.direct){ const rows=D.direct.rows.filter(r=>same(r[0])); for(const r of rows){ n++; h+=`<div class="card"><h2>🏪 직거래 <span class="muted" style="font-weight:400">· ${esc(r[2])} · ${esc(r[1])}</span></h2><div class="tbox" style="margin-top:8px"><table><thead><tr><th class="l">회사</th>${D.direct.months.map(m=>`<th>${m}월</th>`).join('')}<th>합계</th></tr></thead><tbody>${CO.map((c,ci)=>`<tr class="${ci===3?'total':''}"><td class="l">${c}</td>${r[3].map(m=>`<td class="num ${m[ci]<0?'down':''}">${m[ci]?f0(m[ci]):'-'}</td>`).join('')}<td class="num">${f0(r[3].reduce((a,m)=>a+m[ci],0))}</td></tr>`).join('')}</tbody></table></div></div>`; } }
+  if(D.well){ const ni=D.well.headers.indexOf('병원명'); const rows=D.well.rows.filter(r=>same(r[ni])); if(rows.length){ n++; h+=`<div class="card"><h2>💚 ${esc(D.well.sheet)}</h2><div style="margin-top:8px">${wellTable(rows,false)}</div></div>`; } }
+  if(D.welda){ const rows=D.welda.rows.filter(r=>same(r[D.welda.ni])); if(rows.length){ n++; h+=`<div class="card"><h2>웰다</h2><div style="margin-top:8px">${genTable(D.welda,rows,false)}</div></div>`; } }
+  for(const t of D.lists){ const rows=t.rows.filter(r=>same(r[t.ni])); if(rows.length){ n++; h+=`<div class="card"><h2>${esc(t.title)} <span class="muted" style="font-weight:400">· ${esc(t.sheet)}</span></h2><div style="margin-top:8px">${genTable(t,rows,false)}</div></div>`; } }
+  if(!n) h+=`<div class="empty">이 거래처의 자료가 없습니다.</div>`;
+  $('#main').innerHTML=h; bindCommon();
+}
+
+function bindCommon(){
+  $('#main').querySelectorAll('[data-rep]').forEach(el=>el.onclick=e=>{ e.stopPropagation(); go({v:'rep',name:el.dataset.rep}); });
+  $('#main').querySelectorAll('[data-client]').forEach(el=>el.onclick=()=>go({v:'client',name:el.dataset.client}));
+  $('#main').querySelectorAll('.menu [data-go]').forEach(el=>el.onclick=()=>go({v:el.dataset.go}));
+}
+function render(){
+  if(!D) return; crumbs();
+  $('#asof').textContent=D.exportedAt?'갱신 '+stamp(D.exportedAt):'';
+  if(route.v!=='xs') $('#q').value='';
+  ({home:vHome,rep:vRep,wc:vWc,dt:vDt,xs:vXs,client:vClient}[route.v]||vHome)();
+}
+function stamp(iso){ const d=new Date(iso); if(isNaN(d)) return ''; const p=n=>String(n).padStart(2,'0'); return `${d.getMonth()+1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`; }
+
+/* =====================================================================
+   시작: 직원 = k2.enc 열기 / 관리자(?admin=1) = 시트 엑셀 불러오기 → 내보내기
+   ===================================================================== */
+function showGate(env,msg){
+  $('#main').innerHTML=`<div class="gate card"><h1>🔒 경인1 K2</h1><p class="sub" style="margin:8px auto 0">현황판과 같은 비밀번호로 열립니다.</p>
+    <form id="gf" autocomplete="off"><input type="password" id="gpw" placeholder="비밀번호" autofocus>
+    <label style="display:block;margin-top:10px;font-size:13px;color:var(--ink2)"><input type="checkbox" id="grem" checked> 이 브라우저에서 기억하기</label></form>
+    <div class="err" id="gerr">${esc(msg||'')}</div><div class="asof">${env?'최근 갱신: '+esc(stamp(env.at)):''}</div></div>`;
+  $('#gf').onsubmit=async e=>{ e.preventDefault(); const pw=$('#gpw').value; if(!pw) return; $('#gerr').textContent='확인 중…';
+    try{ const key=await deriveKey(pw,b64dec(env.salt),env.iter); const b=await decrypt(env,key);
+      if($('#grem').checked) LS.set('tb.key',b64enc(new Uint8Array(await subtle().exportKey('raw',key))));
+      load(b);
+    }catch(err){ console.warn(err); $('#gerr').textContent=/형식|https/.test(err.message)?err.message:'비밀번호가 맞지 않습니다'; } };
+}
+function load(b){ if(!b||b.fmt!=='k2-1') throw new Error('데이터 묶음 형식이 맞지 않습니다'); D=b; hist.length=0; route={v:'home'}; render(); }
+
+async function viewerBoot(){
+  $('#btnLock').hidden=false;
+  $('#main').innerHTML='<div class="empty">데이터를 불러오는 중…</div>';
+  let env=null;
+  try{ const r=await fetch('k2.enc?v='+Date.now(),{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); env=await r.json(); }
+  catch(e){ $('#main').innerHTML='<div class="gate card"><h1>경인1 K2</h1><p class="sub" style="margin:8px auto 0">아직 게시된 데이터가 없습니다 (k2.enc 없음). 관리자에게 문의하세요.</p></div>'; return; }
+  const raw=LS.get('tb.key');
+  if(raw){ try{ const key=await subtle().importKey('raw',b64dec(raw),'AES-GCM',true,['decrypt']); load(await decrypt(env,key)); return; }catch(e){ /* 키가 바뀜 → 비밀번호 */ } }
+  showGate(env, raw?'데이터 비밀번호가 바뀌었습니다. 다시 입력하세요.':'');
+}
+$('#btnLock').onclick=()=>{ LS.del('tb.key'); location.reload(); };
+
+/* ---- 관리자 ---- */
+let xlsxReady=null;
+function loadXLSX(){ return xlsxReady||(xlsxReady=new Promise((ok,no)=>{ if(window.XLSX) return ok(); const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'; s.onload=()=>ok(); s.onerror=()=>no(new Error('엑셀 읽기 도구를 불러오지 못했습니다 (인터넷 연결 확인)')); document.head.appendChild(s); })); }
+async function readFile(file){
+  $('#main').innerHTML=`<div class="empty">「${esc(file.name)}」 읽는 중…</div>`;
+  try{
+    await loadXLSX();
+    const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
+    const b=buildFromWorkbook(wb); b.source=file.name.replace(/\.[^.]+$/,'');
+    if(!b.perf&&!b.well&&!b.direct) throw new Error('2026 실적 / 웰체크 / 직거래현황 탭을 하나도 찾지 못했습니다. 2026_GI.1 시트를 엑셀로 내려받은 파일인지 확인하세요.');
+    try{ sessionStorage.setItem('k2.draft',JSON.stringify(b)); }catch(e){}
+    load(b); $('#btnExport').disabled=false;
+  }catch(err){ console.error(err); adminEmpty(err.message); }
+}
+function adminEmpty(err){
+  $('#main').innerHTML=`<div class="sec"><h1>관리자 · 데이터 올리기</h1><p class="sub">구글시트를 엑셀로 내려받아 넣으면 화면을 미리 보고, 직원용 암호화 파일(k2.enc)로 내보낼 수 있습니다.</p></div>
+  ${err?`<div class="note">${esc(err)}</div>`:''}
+  <div class="drop" id="drop"><b style="font-size:16px">📥 여기에 2026_GI.1.xlsx 를 끌어다 놓거나 눌러서 고르세요</b><br>
+  <ol><li>구글시트 「2026_GI.1」 → <b>파일 › 다운로드 › Microsoft Excel (.xlsx)</b></li>
+  <li>받은 파일을 이 칸에 놓기 → 화면 확인</li>
+  <li>오른쪽 위 <b>🌐 게시용 내보내기</b> → 현황판과 <b>같은 비밀번호</b> 입력 → <b>k2.enc</b> 저장</li>
+  <li>GitHub 저장소에 k2.enc 올리기 (Add file › Upload files, 기존 파일 덮어쓰기)</li></ol>
+  <p class="muted" style="font-size:12px;margin-top:12px">읽는 탭: 2026 실적 · N월 웰체크(가장 최근 달) · 웰다 · 직거래현황 · N월 펙수 예측 · 품목/관리 목록 ${LIST_SHEETS.length}개.<br>「경인1 인적사항」 등 그 밖의 탭은 읽지도, 내보내지도 않습니다. 파일은 이 브라우저 안에서만 처리됩니다.</p></div>`;
+  const dz=$('#drop'); dz.onclick=()=>$('#fileInput').click();
+  dz.ondragover=e=>{ e.preventDefault(); dz.classList.add('over'); }; dz.ondragleave=()=>dz.classList.remove('over');
+  dz.ondrop=e=>{ e.preventDefault(); dz.classList.remove('over'); const f=e.dataTransfer.files[0]; if(f) readFile(f); };
+}
+function adminBoot(){
+  document.querySelectorAll('.admin-only').forEach(el=>el.hidden=false);
+  $('#btnImport').onclick=()=>$('#fileInput').click();
+  $('#fileInput').onchange=e=>{ const f=e.target.files[0]; if(f) readFile(f); e.target.value=''; };
+  document.addEventListener('dragover',e=>e.preventDefault());
+  document.addEventListener('drop',e=>{ e.preventDefault(); const f=e.dataTransfer&&e.dataTransfer.files[0]; if(f&&/\.xlsx?$/i.test(f.name)) readFile(f); });
+  $('#btnExport').onclick=async()=>{
+    if(!D){ alert('먼저 시트 엑셀을 불러오세요.'); return; }
+    const pw=prompt('직원용 비밀번호를 입력하세요.\n현황판(data.enc)과 같은 비밀번호를 쓰면 직원은 다시 입력하지 않아도 됩니다.'); if(!pw) return;
+    const pw2=prompt('확인을 위해 한 번 더 입력하세요.'); if(pw!==pw2){ alert('두 비밀번호가 다릅니다.'); return; }
+    try{ const b=Object.assign({},D); delete b._idx; b.exportedAt=new Date().toISOString(); const env=await encrypt(b,pw);
+      const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(env)],{type:'application/json'})); a.download='k2.enc'; document.body.appendChild(a); a.click(); a.remove();
+      alert('k2.enc 를 저장했습니다.\nGitHub 저장소(vision-board)에 올리면 직원 화면에 반영됩니다.');
+    }catch(err){ alert('내보내기 실패: '+err.message); }
+  };
+  let draft=null; try{ draft=JSON.parse(sessionStorage.getItem('k2.draft')||'null'); }catch(e){}
+  if(draft&&draft.fmt==='k2-1') load(draft); else adminEmpty();
+}
+
+if(ADMIN) adminBoot(); else viewerBoot();
+})();
+</script>
+</body>
+</html>
