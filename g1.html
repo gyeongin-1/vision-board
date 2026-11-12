@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>경인1 K2</title>
+<title>경인1 G1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
 <style>
-/* 경인1 K2 — 구글시트(2026_GI.1)를 데이터로, 요약 → 담당자 → 거래처 순 드릴다운 */
+/* 경인1 G1 — 구글시트(2026_GI.1)를 데이터로, 요약 → 담당자 → 거래처 순 드릴다운 */
 :root{
   color-scheme:light;
   --bg:#f3f5f4; --surface:#fff; --sunk:#e9edeb; --line:#d5dcd8; --ink:#16211d; --ink2:#4a5a53; --ink3:#77867f;
@@ -163,7 +163,7 @@ tr.total td{font-weight:700;background:var(--sunk)}
 <div class="wrap">
   <header class="top">
     <button class="back" id="backBtn" type="button" hidden>↩ 뒤로</button>
-    <button class="brand" id="homeBtn" type="button">경인1 K2</button>
+    <button class="brand" id="homeBtn" type="button">경인1 G1</button>
     <nav class="crumbs" id="crumbs" aria-label="경로"></nav>
     <label class="search"><input id="q" type="search" placeholder="거래처·약국·담당자 검색" autocomplete="off" aria-label="검색"></label>
     <span class="asof" id="asof"></span>
@@ -186,8 +186,8 @@ const ADMIN=/[?&]admin=1/.test(location.search);
 const LS={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 
 /* ---------- 테마 ---------- */
-(function(){const t=LS.get('k2.theme'); if(t) document.documentElement.dataset.theme=t;})();
-$('#btnTheme').onclick=()=>{const r=document.documentElement; const dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches; r.dataset.theme=dark?'light':'dark'; LS.set('k2.theme',r.dataset.theme);};
+(function(){const t=LS.get('g1.theme'); if(t) document.documentElement.dataset.theme=t;})();
+$('#btnTheme').onclick=()=>{const r=document.documentElement; const dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches; r.dataset.theme=dark?'light':'dark'; LS.set('g1.theme',r.dataset.theme);};
 
 /* ---------- 숫자 ---------- */
 const N=v=>{ if(v==null||v===''||v==='-') return 0; if(typeof v==='number') return isFinite(v)?v:0; const n=parseFloat(String(v).replace(/[,\s원]/g,'')); return isFinite(n)?n:0; };
@@ -306,7 +306,7 @@ function parsePexu(rows,sheet){
 function buildFromWorkbook(wb){
   const S=n=>wb.Sheets[n]?XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,cellDates:true}):null;
   const names=wb.SheetNames;
-  const b={fmt:'k2-1',exportedAt:new Date().toISOString(),source:'2026_GI.1',perf:null,well:null,welda:null,direct:null,pexu:null,lists:[]};
+  const b={fmt:'g1-1',exportedAt:new Date().toISOString(),source:'2026_GI.1',perf:null,well:null,welda:null,direct:null,pexu:null,lists:[]};
   const perfName=names.find(n=>/^20\d\d 실적$/.test(n))||names.find(n=>n==='실적현황');
   if(perfName) b.perf=parsePerf(S(perfName));
   const wn=latestSheet(names,/^(\d+)월 웰체크$/); if(wn) b.well=parseWell(S(wn),wn);
@@ -375,7 +375,7 @@ function vHome(){
   const wellTot=D.well&&D.well.summary.find(s=>OFFICE_ROW.test(s.name));
   const dtTot=D.direct?D.direct.rows.reduce((s,r)=>s+r[3].reduce((a,m)=>a+m[3],0),0):0;
   const listCnt=D.lists.reduce((s,t)=>s+t.rows.length,0);
-  let h=`<div class="sec"><h1>경인1 K2 · ${Q?esc(Q.label):''} 성장률 평가</h1><p class="sub">「${esc(D.source||'2026_GI.1')}」 시트 기준 · 금액 단위 백만원 · 담당자를 누르면 담당자 화면으로 들어갑니다.</p></div>`;
+  let h=`<div class="sec"><h1>경인1 G1 · ${Q?esc(Q.label):''} 성장률 평가</h1><p class="sub">「${esc(D.source||'2026_GI.1')}」 시트 기준 · 금액 단위 백만원 · 담당자를 누르면 담당자 화면으로 들어갑니다.</p></div>`;
   h+=`<div class="row"><div class="seg" id="qseg">${qs.map(q=>`<button data-q="${q.q}" class="${q.q===sel?'on':''}">${q.q}분기</button>`).join('')}${P&&P.annual?`<button data-q="0" class="${sel===0?'on':''}">연간</button>`:''}</div></div>`;
   if(office){
     h+=`<div class="kpis">
@@ -568,10 +568,10 @@ function render(){
 function stamp(iso){ const d=new Date(iso); if(isNaN(d)) return ''; const p=n=>String(n).padStart(2,'0'); return `${d.getMonth()+1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`; }
 
 /* =====================================================================
-   시작: 직원 = k2.enc 열기 / 관리자(?admin=1) = 시트 엑셀 불러오기 → 내보내기
+   시작: 직원 = g1.enc 열기 / 관리자(?admin=1) = 시트 엑셀 불러오기 → 내보내기
    ===================================================================== */
 function showGate(env,msg){
-  $('#main').innerHTML=`<div class="gate card"><h1>🔒 경인1 K2</h1><p class="sub" style="margin:8px auto 0">현황판과 같은 비밀번호로 열립니다.</p>
+  $('#main').innerHTML=`<div class="gate card"><h1>🔒 경인1 G1</h1><p class="sub" style="margin:8px auto 0">현황판과 같은 비밀번호로 열립니다.</p>
     <form id="gf" autocomplete="off"><input type="password" id="gpw" placeholder="비밀번호" autofocus>
     <label style="display:block;margin-top:10px;font-size:13px;color:var(--ink2)"><input type="checkbox" id="grem" checked> 이 브라우저에서 기억하기</label></form>
     <div class="err" id="gerr">${esc(msg||'')}</div><div class="asof">${env?'최근 갱신: '+esc(stamp(env.at)):''}</div></div>`;
@@ -581,14 +581,14 @@ function showGate(env,msg){
       load(b);
     }catch(err){ console.warn(err); $('#gerr').textContent=/형식|https/.test(err.message)?err.message:'비밀번호가 맞지 않습니다'; } };
 }
-function load(b){ if(!b||b.fmt!=='k2-1') throw new Error('데이터 묶음 형식이 맞지 않습니다'); D=b; hist.length=0; route={v:'home'}; render(); }
+function load(b){ if(!b||b.fmt!=='g1-1') throw new Error('데이터 묶음 형식이 맞지 않습니다'); D=b; hist.length=0; route={v:'home'}; render(); }
 
 async function viewerBoot(){
   $('#btnLock').hidden=false;
   $('#main').innerHTML='<div class="empty">데이터를 불러오는 중…</div>';
   let env=null;
-  try{ const r=await fetch('k2.enc?v='+Date.now(),{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); env=await r.json(); }
-  catch(e){ $('#main').innerHTML='<div class="gate card"><h1>경인1 K2</h1><p class="sub" style="margin:8px auto 0">아직 게시된 데이터가 없습니다 (k2.enc 없음). 관리자에게 문의하세요.</p></div>'; return; }
+  try{ const r=await fetch('g1.enc?v='+Date.now(),{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); env=await r.json(); }
+  catch(e){ $('#main').innerHTML='<div class="gate card"><h1>경인1 G1</h1><p class="sub" style="margin:8px auto 0">아직 게시된 데이터가 없습니다 (g1.enc 없음). 관리자에게 문의하세요.</p></div>'; return; }
   const raw=LS.get('tb.key');
   if(raw){ try{ const key=await subtle().importKey('raw',b64dec(raw),'AES-GCM',true,['decrypt']); load(await decrypt(env,key)); return; }catch(e){ /* 키가 바뀜 → 비밀번호 */ } }
   showGate(env, raw?'데이터 비밀번호가 바뀌었습니다. 다시 입력하세요.':'');
@@ -605,18 +605,18 @@ async function readFile(file){
     const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
     const b=buildFromWorkbook(wb); b.source=file.name.replace(/\.[^.]+$/,'');
     if(!b.perf&&!b.well&&!b.direct) throw new Error('2026 실적 / 웰체크 / 직거래현황 탭을 하나도 찾지 못했습니다. 2026_GI.1 시트를 엑셀로 내려받은 파일인지 확인하세요.');
-    try{ sessionStorage.setItem('k2.draft',JSON.stringify(b)); }catch(e){}
+    try{ sessionStorage.setItem('g1.draft',JSON.stringify(b)); }catch(e){}
     load(b); $('#btnExport').disabled=false;
   }catch(err){ console.error(err); adminEmpty(err.message); }
 }
 function adminEmpty(err){
-  $('#main').innerHTML=`<div class="sec"><h1>관리자 · 데이터 올리기</h1><p class="sub">구글시트를 엑셀로 내려받아 넣으면 화면을 미리 보고, 직원용 암호화 파일(k2.enc)로 내보낼 수 있습니다.</p></div>
+  $('#main').innerHTML=`<div class="sec"><h1>관리자 · 데이터 올리기</h1><p class="sub">구글시트를 엑셀로 내려받아 넣으면 화면을 미리 보고, 직원용 암호화 파일(g1.enc)로 내보낼 수 있습니다.</p></div>
   ${err?`<div class="note">${esc(err)}</div>`:''}
   <div class="drop" id="drop"><b style="font-size:16px">📥 여기에 2026_GI.1.xlsx 를 끌어다 놓거나 눌러서 고르세요</b><br>
   <ol><li>구글시트 「2026_GI.1」 → <b>파일 › 다운로드 › Microsoft Excel (.xlsx)</b></li>
   <li>받은 파일을 이 칸에 놓기 → 화면 확인</li>
-  <li>오른쪽 위 <b>🌐 게시용 내보내기</b> → 현황판과 <b>같은 비밀번호</b> 입력 → <b>k2.enc</b> 저장</li>
-  <li>GitHub 저장소에 k2.enc 올리기 (Add file › Upload files, 기존 파일 덮어쓰기)</li></ol>
+  <li>오른쪽 위 <b>🌐 게시용 내보내기</b> → 현황판과 <b>같은 비밀번호</b> 입력 → <b>g1.enc</b> 저장</li>
+  <li>GitHub 저장소에 g1.enc 올리기 (Add file › Upload files, 기존 파일 덮어쓰기)</li></ol>
   <p class="muted" style="font-size:12px;margin-top:12px">읽는 탭: 2026 실적 · N월 웰체크(가장 최근 달) · 웰다 · 직거래현황 · N월 펙수 예측 · 품목/관리 목록 ${LIST_SHEETS.length}개.<br>「경인1 인적사항」 등 그 밖의 탭은 읽지도, 내보내지도 않습니다. 파일은 이 브라우저 안에서만 처리됩니다.</p></div>`;
   const dz=$('#drop'); dz.onclick=()=>$('#fileInput').click();
   dz.ondragover=e=>{ e.preventDefault(); dz.classList.add('over'); }; dz.ondragleave=()=>dz.classList.remove('over');
@@ -633,12 +633,12 @@ function adminBoot(){
     const pw=prompt('직원용 비밀번호를 입력하세요.\n현황판(data.enc)과 같은 비밀번호를 쓰면 직원은 다시 입력하지 않아도 됩니다.'); if(!pw) return;
     const pw2=prompt('확인을 위해 한 번 더 입력하세요.'); if(pw!==pw2){ alert('두 비밀번호가 다릅니다.'); return; }
     try{ const b=Object.assign({},D); delete b._idx; b.exportedAt=new Date().toISOString(); const env=await encrypt(b,pw);
-      const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(env)],{type:'application/json'})); a.download='k2.enc'; document.body.appendChild(a); a.click(); a.remove();
-      alert('k2.enc 를 저장했습니다.\nGitHub 저장소(vision-board)에 올리면 직원 화면에 반영됩니다.');
+      const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(env)],{type:'application/json'})); a.download='g1.enc'; document.body.appendChild(a); a.click(); a.remove();
+      alert('g1.enc 를 저장했습니다.\nGitHub 저장소(vision-board)에 올리면 직원 화면에 반영됩니다.');
     }catch(err){ alert('내보내기 실패: '+err.message); }
   };
-  let draft=null; try{ draft=JSON.parse(sessionStorage.getItem('k2.draft')||'null'); }catch(e){}
-  if(draft&&draft.fmt==='k2-1') load(draft); else adminEmpty();
+  let draft=null; try{ draft=JSON.parse(sessionStorage.getItem('g1.draft')||'null'); }catch(e){}
+  if(draft&&draft.fmt==='g1-1') load(draft); else adminEmpty();
 }
 
 if(ADMIN) adminBoot(); else viewerBoot();
