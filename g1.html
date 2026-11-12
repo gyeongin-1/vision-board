@@ -577,7 +577,7 @@ function showGate(env,msg){
     <div class="err" id="gerr">${esc(msg||'')}</div><div class="asof">${env?'최근 갱신: '+esc(stamp(env.at)):''}</div></div>`;
   $('#gf').onsubmit=async e=>{ e.preventDefault(); const pw=$('#gpw').value; if(!pw) return; $('#gerr').textContent='확인 중…';
     try{ const key=await deriveKey(pw,b64dec(env.salt),env.iter); const b=await decrypt(env,key);
-      if($('#grem').checked) LS.set('tb.key',b64enc(new Uint8Array(await subtle().exportKey('raw',key))));
+      if($('#grem').checked) LS.set('g1.key',b64enc(new Uint8Array(await subtle().exportKey('raw',key))));
       load(b);
     }catch(err){ console.warn(err); $('#gerr').textContent=/형식|https/.test(err.message)?err.message:'비밀번호가 맞지 않습니다'; } };
 }
@@ -589,11 +589,13 @@ async function viewerBoot(){
   let env=null;
   try{ const r=await fetch('g1.enc?v='+Date.now(),{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); env=await r.json(); }
   catch(e){ $('#main').innerHTML='<div class="gate card"><h1>경인1 G1</h1><p class="sub" style="margin:8px auto 0">아직 게시된 데이터가 없습니다 (g1.enc 없음). 관리자에게 문의하세요.</p></div>'; return; }
-  const raw=LS.get('tb.key');
-  if(raw){ try{ const key=await subtle().importKey('raw',b64dec(raw),'AES-GCM',true,['decrypt']); load(await decrypt(env,key)); return; }catch(e){ /* 키가 바뀜 → 비밀번호 */ } }
-  showGate(env, raw?'데이터 비밀번호가 바뀌었습니다. 다시 입력하세요.':'');
+  // G1 전용 키(g1.key) → 현황판 키(tb.key, 같은 비밀번호·소금이면 그대로 열림) 순으로 시도. 현황판 키는 덮어쓰지 않는다
+  const own=LS.get('g1.key');
+  for(const raw of [own,LS.get('tb.key')]){ if(!raw) continue; try{ const key=await subtle().importKey('raw',b64dec(raw),'AES-GCM',true,['decrypt']); load(await decrypt(env,key)); return; }catch(e){ /* 맞지 않음 */ } }
+  if(own) LS.del('g1.key');
+  showGate(env, own?'데이터 비밀번호가 바뀌었습니다. 다시 입력하세요.':'');
 }
-$('#btnLock').onclick=()=>{ LS.del('tb.key'); location.reload(); };
+$('#btnLock').onclick=()=>{ LS.del('g1.key'); location.reload(); };
 
 /* ---- 관리자 ---- */
 let xlsxReady=null;
